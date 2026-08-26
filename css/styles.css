@@ -2886,3 +2886,65 @@ body.light .code-block {
     padding: 2.5rem 0;
   }
 }
+
+
+/* ============================================================
+   PROJECT SCREENSHOT GALLERY
+   Used in blog-post-1.html to display proof-of-work images
+   from the assets/project 1/ folder
+   ============================================================ */
+
+/* Full-width single screenshot */
+.project-screenshot {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  display: block;
+  margin: 1.25rem 0 0.5rem;
+  object-fit: cover;
+}
+
+/* Caption below a single screenshot */
+.screenshot-caption {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+/* Two-column screenshot grid */
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.screenshot-grid figure {
+  margin: 0;
+}
+
+.screenshot-grid img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  object-fit: cover;
+}
+
+.screenshot-grid figcaption {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 0.4rem;
+  font-style: italic;
+}
+
+/* Stack to single column on small screens */
+@media (max-width: 640px) {
+  .screenshot-grid {
+    grid-template-columns: 1fr;
+  }
+}

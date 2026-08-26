@@ -140,9 +140,31 @@ Amazon S3 Static Website Hosting</pre>
         </ul>
         <p>One important lesson I learned was understanding the difference between the S3 REST endpoint and the S3 static website endpoint — a distinction that becomes critical when integrating CloudFront.</p>
 
+        <div class="screenshot-grid">
+          <figure>
+            <img src="assets/project 1/image 1.jpeg" alt="S3 bucket successfully created" class="project-screenshot" loading="lazy" />
+            <figcaption>S3 bucket created — empty and ready for file upload</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/project 1/image 2.jpeg" alt="Files uploaded to S3 bucket" class="project-screenshot" loading="lazy" />
+            <figcaption>All 11 project files uploaded successfully to the bucket</figcaption>
+          </figure>
+        </div>
+
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
           <div><strong>Key Insight:</strong> Always use the S3 <em>website endpoint</em> (not the bucket ARN) as the CloudFront origin. This ensures proper routing of requests to <code>index.html</code>.</div>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="assets/project 1/image 3.jpeg" alt="403 Forbidden error before bucket policy" class="project-screenshot" loading="lazy" />
+            <figcaption>403 Forbidden — access denied before the bucket policy was applied</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/project 1/image 4.jpeg" alt="S3 bucket policy successfully edited" class="project-screenshot" loading="lazy" />
+            <figcaption>Bucket policy applied — public read access granted successfully</figcaption>
+          </figure>
         </div>
 
         <hr class="article-divider" />
@@ -156,6 +178,22 @@ Amazon S3 Static Website Hosting</pre>
           <div><strong>Important:</strong> ACM certificates for CloudFront must always be requested in <strong>us-east-1 (N. Virginia)</strong> — even if your S3 bucket is in a different region.</div>
         </div>
 
+        <p>With the bucket policy fixed and the site accessible, here is what the portfolio looked like live on the S3 website endpoint:</p>
+
+        <img src="assets/project 1/image 5.jpeg" alt="Portfolio live on S3 — homepage" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Portfolio homepage live on the S3 static website endpoint — hero section rendering correctly</p>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="assets/project 1/image 6.jpeg" alt="Blog section of the live portfolio" loading="lazy" />
+            <figcaption>Blog section rendering live — latest posts visible</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/project 1/image 7.jpeg" alt="About section of the live portfolio" loading="lazy" />
+            <figcaption>About section live — profile, skills, and social links loaded</figcaption>
+          </figure>
+        </div>
+
         <hr class="article-divider" />
 
         <h2>Step 3 — Setting Up CloudFront CDN</h2>
@@ -167,6 +205,9 @@ Amazon S3 Static Website Hosting</pre>
           <li>Setting the S3 website endpoint as the origin</li>
         </ul>
         <p>This significantly improves website performance and scalability for users across different geographic regions.</p>
+
+        <img src="assets/project 1/image 8.jpeg" alt="CloudFront distribution successfully created" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">CloudFront distribution created — distribution ID E3P156TP8KV2L1 deployed successfully</p>
 
         <hr class="article-divider" />
 
