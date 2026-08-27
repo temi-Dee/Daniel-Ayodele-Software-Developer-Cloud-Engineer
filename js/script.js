@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // ── Active nav link on scroll (IntersectionObserver) ───
   const sections = document.querySelectorAll("section[id]");
   const navItems = Array.from(
-    document.querySelectorAll('.nav-links a[href^="#"], .nav-links a[href*="#"]')
+    document.querySelectorAll('.nav-links a[href^="#"], .nav-links a[href*="#"], .nav-links a[href="index.html"]')
   ).filter(function (a) {
     return !a.getAttribute("href").startsWith("blog");
   });
