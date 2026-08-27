@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CI/CD Pipeline with GitHub Actions | Daniel Ayodele</title>
+  <meta name="description"
+    content="How I built a CI/CD pipeline with GitHub Actions that tests a Node.js application, authenticates with AWS using OIDC, and deploys to S3 and CloudFront." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="icon" type="image/png" href="../assets/logo.png" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/blog.css" />
+</head>
+
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container container">
+      <a href="../index.html" class="nav-logo">
+        <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        <span class="nav-tagline">AWS Cloud Engineer<span class="nav-tagline-sep">|</span>Cybersecurity</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../index.html#projects">Projects</a></li>
+        <li><a href="index.html" class="nav-active">Blog</a></li>
+        <li><a href="../index.html#about">About</a></li>
+        <li><a href="../contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light mode">
+          <i class="fas fa-sun" id="themeIcon"></i>
+        </button>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== ARTICLE HERO ===== -->
+  <section class="article-hero">
+    <div class="container article-hero-inner">
+      <div class="article-meta-top">
+        <span class="blog-cat-pill"><i class="fas fa-flask"></i> AWS LABS</span>
+        <span class="article-read-time"><i class="fas fa-clock"></i> 12 min read</span>
+      </div>
+      <h1>Project 05 — CI/CD Pipeline with GitHub Actions</h1>
+      <p class="article-subtitle">How I automated testing and deployment for a Node.js application with GitHub Actions,
+        AWS OIDC authentication, S3, and CloudFront.</p>
+      <div class="article-author">
+        <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-avatar" />
+        <div>
+          <strong>Daniel Ayodele</strong>
+          <span>AWS Cloud Engineer &amp; Cybersecurity Enthusiast</span>
+        </div>
+      </div>
+      <div class="article-tags">
+        <span>GitHub Actions</span><span>CI/CD</span><span>AWS OIDC</span><span>S3</span><span>CloudFront</span><span>Node.js</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ARTICLE BODY ===== -->
+  <article class="article-body">
+    <div class="container article-layout">
+
+      <!-- Main Content -->
+      <div class="article-content">
+
+        <p class="article-lead">Projects 01 through 04 taught me how to build and connect AWS infrastructure. Project 05
+          focused on what happens after the infrastructure exists: how code moves from my laptop to a deployed
+          environment without a manual checklist every time. I built a small Node.js API, added tests and linting, then
+          connected GitHub Actions to AWS so every push could be checked automatically and a successful build could be
+          deployed.</p>
+
+        <hr class="article-divider" />
+
+        <h2>The Problem I Wanted to Fix</h2>
+        <p>Manual deployments are easy to accept when a project is small. Run the tests, copy the files, update the
+          bucket, and hope nothing was forgotten. The problem is that this process depends on memory, and memory is not
+          a very reliable deployment system.</p>
+        <p>The goal here was simple: every change should go through the same steps. GitHub Actions would install the
+          dependencies, run ESLint, run Jest, authenticate with AWS without storing long-lived access keys, and deploy
+          only when the checks passed.</p>
+
+        <hr class="article-divider" />
+
+        <h2>Services and Technologies Used</h2>
+
+        <div class="article-table-wrap">
+          <table class="article-table">
+            <thead>
+              <tr>
+                <th>Tool or Service</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="code-inline">GitHub Actions</span></td>
+                <td>Runs the CI checks and deployment workflow on every push</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">AWS IAM OIDC</span></td>
+                <td>Lets GitHub Actions request temporary AWS credentials without stored access keys</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Amazon S3</span></td>
+                <td>Stores the deployment artifacts and serves the static site</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Amazon CloudFront</span></td>
+                <td>Distributes the deployed content through a CDN</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Node.js and Express</span></td>
+                <td>Provides the sample application and its API endpoints</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Jest and ESLint</span></td>
+                <td>Tests the application and checks code quality before deployment</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>How the Pipeline Fits Together</h2>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>CI/CD Flow</span></div>
+          <pre>Developer pushes to GitHub
+        │
+        ▼
+GitHub Actions workflow starts
+        │
+        ├── Checkout source code
+        ├── Install Node.js dependencies
+        ├── Run ESLint
+        └── Run Jest tests
+                │
+                ▼
+        Request temporary AWS credentials through OIDC
+                │
+                ▼
+        Deploy artifacts to Amazon S3
+                │
+                ▼
+        Invalidate CloudFront cache</pre>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 1 — Scaffolding the Application</h2>
+        <p>I started with a setup script that created a small Express application, a Jest test suite, an ESLint
+          configuration, and the GitHub Actions workflow files. The point was not to build a complex product. It was to
+          have enough real code for the pipeline to lint, test, and deploy.</p>
+        <p>Running the script also initialized the local Git repository. Seeing the project files appear and the first
+          test pass made the workflow feel tangible before AWS was involved.</p>
+
+        <img src="../assets/images/blog/project 5/1.jpeg" alt="Project 5 setup script completing tests and initializing Git"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">The setup script completed successfully: dependencies were installed, tests passed, and the Git repository was initialized</p>
+
+        <hr class="article-divider" />
+
+        <h2>Step 2 — Provisioning the AWS Side</h2>
+        <p>The AWS configuration script created the resources the workflow needed: an S3 bucket, a CloudFront
+          distribution, an IAM role for GitHub Actions, and the GitHub OIDC provider. It also attached a focused inline
+          policy so the workflow could deploy without receiving broad administrator permissions.</p>
+        <p>The most important part was the trust relationship. Instead of saving an AWS access key in GitHub, the IAM
+          role trusts tokens issued by GitHub Actions for the repository. Those credentials are temporary and disappear
+          when the workflow ends.</p>
+
+        <img src="../assets/images/blog/project 5/2.jpeg" alt="AWS configuration script completing S3, CloudFront, IAM, and OIDC setup"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">AWS provisioning completed: the S3 bucket, CloudFront distribution, IAM role, and least-privilege OIDC policy were created</p>
+
+        <div class="article-callout info">
+          <i class="fas fa-lightbulb"></i>
+          <div><strong>Why OIDC matters:</strong> A deployment workflow should not depend on a permanent access key that
+            can be copied or accidentally exposed. OIDC gives the workflow short-lived credentials tied to its identity
+            and repository context.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 3 — Looking Inside the Generated Project</h2>
+        <p>The setup script generated the application and workflow files in a predictable structure. The application
+          lived under <span class="code-inline">my-app</span>, with source code, tests, package metadata, and separate
+          workflow definitions for checking and deploying the project.</p>
+        <p>This separation helped me see CI and CD as related but different responsibilities. CI answers whether the
+          code is healthy. CD handles moving that healthy code to AWS.</p>
+
+        <img src="../assets/images/blog/project 5/3.jpeg" alt="Generated Node.js application files and Git repository initialization"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Generated project structure showing the application files, GitHub workflow files, package configuration, and initialized repository</p>
+
+        <hr class="article-divider" />
+
+        <h2>Step 4 — Watching GitHub Actions Run</h2>
+        <p>After pushing the project, GitHub Actions began running the workflows automatically. The Actions page showed
+          the pipeline history, including successful CI runs and failed deployment attempts while I was correcting the
+          configuration.</p>
+        <p>That history was useful in its own way. A failed run is not just a red icon; it gives you a timestamp, commit,
+          branch, and logs to work from. Once the workflow was corrected, the successful run became evidence that the
+          complete process could execute from a clean push.</p>
+
+        <img src="../assets/images/blog/project 5/4.jpeg" alt="GitHub Actions workflow runs for the Project 5 repository"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">GitHub Actions history showing CI/CD workflow runs, including a successful CI pipeline and deployment runs under review</p>
+
+        <div class="article-callout warning">
+          <i class="fas fa-triangle-exclamation"></i>
+          <div><strong>Failures are part of the feedback loop:</strong> A pipeline that fails visibly is more useful than
+            a manual deployment that fails silently. The important thing is to read the job logs, fix the smallest
+            configuration issue, and run the same workflow again.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 5 — Testing Before Deployment</h2>
+        <p>Before trusting the workflow, I ran the tests locally. The Jest suite checked the root response, the health
+          endpoint, and the API information endpoint. The test run also produced a coverage report, which made it clear
+          what the current test suite covered and what it did not.</p>
+        <p>I also ran ESLint separately. This is a small habit, but it makes debugging easier: when a workflow fails, I
+          know whether the problem is code quality, application behavior, AWS authentication, or deployment itself.</p>
+
+        <img src="../assets/images/blog/project 5/5.jpeg" alt="Jest tests passing with coverage output for the Node.js application"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Local Jest run passing all three API tests with coverage output recorded for the application</p>
+
+        <hr class="article-divider" />
+
+        <h2>Step 6 — Checking the App Locally</h2>
+        <p>With the tests passing, I started the Express server and checked the endpoints from the browser. The response
+          confirmed that the application was listening on port 3000 and returning the expected JSON payload.</p>
+        <p>This local check matters because a green deployment pipeline cannot rescue an application that does not behave
+          correctly. The workflow verifies repeatability; the application tests verify behavior.</p>
+
+        <img src="../assets/images/blog/project 5/7.jpeg" alt="Node.js application running locally and returning a JSON response"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">The Express application running on localhost:3000, with the browser returning the expected CI/CD Pipeline JSON response</p>
+
+        <hr class="article-divider" />
+
+        <h2>Step 7 — Cleaning Up AWS Resources</h2>
+        <p>After testing, I ran the cleanup script. It disabled and removed the CloudFront distribution, emptied and deleted
+          the S3 bucket, deleted the IAM role, and removed the GitHub OIDC provider. Cleaning up is part of the project,
+          not an optional extra, especially when the resources can continue generating charges after the experiment is
+          finished.</p>
+
+        <img src="../assets/images/blog/project 5/6.jpeg" alt="AWS cleanup script removing CloudFront, S3, IAM, and OIDC resources"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Cleanup completed successfully: the CloudFront distribution, S3 bucket, IAM role, and OIDC provider were removed</p>
+
+        <hr class="article-divider" />
+
+        <h2>What Needed the Most Attention</h2>
+        <p>The hardest part was not writing the workflow YAML. It was understanding the trust boundary between GitHub and
+          AWS. The workflow needed permission to request credentials, the IAM role needed to trust the right GitHub
+          identity, and the deployment policy needed to be narrow enough to avoid turning CI into an administrator.</p>
+        <p>The failed runs also reinforced a practical lesson: troubleshoot the stage that failed. If Jest passes but AWS
+          authentication fails, there is no value in rewriting the application. The pipeline makes those boundaries
+          visible, which is exactly what good automation should do.</p>
+
+        <hr class="article-divider" />
+
+        <h2>What This Project Taught Me</h2>
+
+        <div class="skills-gained-grid">
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-code-branch"></i> GitHub Actions</h4>
+            <ul>
+              <li>Workflow triggers</li>
+              <li>Jobs and steps</li>
+              <li>CI and CD separation</li>
+              <li>Run history and logs</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-key"></i> Secure AWS Access</h4>
+            <ul>
+              <li>GitHub OIDC provider</li>
+              <li>Temporary credentials</li>
+              <li>IAM trust policies</li>
+              <li>Least-privilege deployment</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-vial"></i> Quality Gates</h4>
+            <ul>
+              <li>Jest API tests</li>
+              <li>ESLint checks</li>
+              <li>Coverage reporting</li>
+              <li>Local verification</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-cloud-arrow-up"></i> AWS Deployment</h4>
+            <ul>
+              <li>S3 deployment artifacts</li>
+              <li>CloudFront distribution</li>
+              <li>Cache invalidation</li>
+              <li>Resource cleanup</li>
+            </ul>
+          </div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>The Bigger Picture</h2>
+        <p>CI/CD is often described as a productivity feature, but this project made it feel more like a reliability and
+          security feature. The pipeline creates a repeatable path for changes, records what happened, and prevents a
+          deployment from skipping the checks that protect it.</p>
+        <p>Using OIDC was the most important design choice. Automation should not require permanent secrets when a
+          workload identity can provide temporary access instead. That idea will matter even more as the applications and
+          AWS environments become larger.</p>
+
+        <div class="article-callout success">
+          <i class="fas fa-circle-check"></i>
+          <div><strong>Real takeaway:</strong> A deployment pipeline is not just a set of commands moved into YAML. It is
+            a shared agreement about what must be true before code reaches production: tests pass, linting passes,
+            credentials are temporary, and every run leaves an audit trail.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>What's Next</h2>
+        <p>The next step would be adding stronger branch protection, dependency and security scanning, environment-specific
+          approvals, and a deployment preview. The foundation is now there: a small application can be tested, deployed,
+          monitored through workflow history, and cleaned up through automation.</p>
+
+        <!-- Tech Stack Summary -->
+        <div class="article-tech-stack">
+          <h4>Tech Stack</h4>
+          <div class="card-tech">
+            <span>GitHub Actions</span><span>Node.js</span><span>Express</span><span>Jest</span>
+            <span>ESLint</span><span>AWS IAM OIDC</span><span>S3</span><span>CloudFront</span>
+          </div>
+        </div>
+
+        <!-- Article Footer Actions -->
+        <div class="article-footer-actions">
+          <a href="index.html" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to Blog</a>
+          <a href="blog-post-4.html" class="btn btn-outline"><i class="fas fa-book-open"></i> Read Project 04</a>
+          <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20read%20your%20CI%2FCD%20article%20and%20would%20like%20to%20connect."
+            target="_blank" rel="noopener" class="btn btn-primary">
+            <i class="fab fa-whatsapp"></i> Discuss on WhatsApp
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Sidebar TOC -->
+      <aside class="article-sidebar">
+        <div class="toc-card">
+          <h4><i class="fas fa-list"></i> Table of Contents</h4>
+          <ol class="toc-list">
+            <li><a href="#" onclick="return false;">Project Overview</a></li>
+            <li><a href="#" onclick="return false;">Services Used</a></li>
+            <li><a href="#" onclick="return false;">CI/CD Flow</a></li>
+            <li><a href="#" onclick="return false;">Step 1 — Application Setup</a></li>
+            <li><a href="#" onclick="return false;">Step 2 — AWS Provisioning</a></li>
+            <li><a href="#" onclick="return false;">Step 3 — Project Structure</a></li>
+            <li><a href="#" onclick="return false;">Step 4 — GitHub Actions</a></li>
+            <li><a href="#" onclick="return false;">Step 5 — Testing</a></li>
+            <li><a href="#" onclick="return false;">Step 6 — Local Verification</a></li>
+            <li><a href="#" onclick="return false;">Step 7 — Cleanup</a></li>
+            <li><a href="#" onclick="return false;">What I Learned</a></li>
+            <li><a href="#" onclick="return false;">What's Next</a></li>
+          </ol>
+        </div>
+
+        <div class="author-card">
+          <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-card-avatar" />
+          <h4>Daniel Ayodele</h4>
+          <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast documenting my cloud journey one project at a time.</p>
+          <div class="author-socials">
+            <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"><i
+                class="fab fa-linkedin-in"></i></a>
+            <a href="https://github.com/temi-Dee" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
+            <a href="mailto:ayodeledaniel0240@gmail.com"><i class="fas fa-envelope"></i></a>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </article>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="../index.html" class="nav-logo">
+          <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        </a>
+        <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast building secure, scalable cloud solutions.</p>
+      </div>
+      <div class="footer-nav">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="../index.html#projects">Projects</a></li>
+          <li><a href="index.html">Blog</a></li>
+          <li><a href="../contact.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-connect">
+        <h4>Connect</h4>
+        <div class="footer-socials">
+          <a href="https://github.com/temi-Dee" target="_blank" rel="noopener" aria-label="GitHub"><i
+              class="fab fa-github"></i></a>
+          <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"
+            aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+          <a href="mailto:ayodeledaniel0240@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom container">
+      <p>&copy; 2026 Daniel Ayodele | AWS Cloud Engineer &amp; Cybersecurity Enthusiast</p>
+      <div class="footer-links">
+        <a href="https://github.com/temi-Dee" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener">LinkedIn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WhatsApp Float -->
+  <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect."
+    class="wa-float" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+    <span class="wa-tooltip">Chat on WhatsApp</span>
+  </a>
+
+  <script src="../js/script.js"></script>
+  <script src="../js/blog.js"></script>
+</body>
+
+</html>
