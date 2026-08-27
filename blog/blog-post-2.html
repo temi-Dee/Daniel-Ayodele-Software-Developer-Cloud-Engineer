@@ -69,13 +69,13 @@
       <!-- Main Content -->
       <div class="article-content">
 
-        <p class="article-lead">After completing Project 01 — hosting a static portfolio on S3 and CloudFront — the natural next step was to work with compute. In Project 02, I launched a hardened Ubuntu Linux server on Amazon EC2, configured it with a proper security group, attached an IAM role, and deployed a live web server using EC2 user data. This project introduced me to the core of cloud compute infrastructure.</p>
+        <p class="article-lead">Project 01 taught me how to host a static site on S3 and serve it through CloudFront. That was a great start, but it felt incomplete. Everything was files sitting in a bucket. For Project 02, I wanted to get into actual compute — a real Linux server running in the cloud that I could configure, access, and watch work. EC2 was the obvious next step, and this is the story of how that went.</p>
 
         <hr class="article-divider" />
 
-        <h2>Project Overview</h2>
-        <p>The goal was to build and deploy a secure, functional Linux web server entirely through the AWS Management Console. Rather than clicking through defaults, I deliberately configured every component — security, access control, networking, and automation — from scratch.</p>
-        <p>The server runs Nginx, is accessible publicly on port 80, and is monitored through CloudWatch. Secure terminal access is available via AWS Session Manager with no SSH key required.</p>
+        <h2>What I Was Building</h2>
+        <p>The idea was straightforward: launch an Ubuntu server on EC2 and have it serve a web page automatically when it boots, without me having to SSH in and manually install anything. I also wanted to do it properly — not just click through the default settings, but actually set up a dedicated security group, attach an IAM role with the right permissions, and monitor the instance through CloudWatch.</p>
+        <p>Simple enough on the surface, but there were a few moving parts that needed to come together in the right order.</p>
 
         <hr class="article-divider" />
 
@@ -100,7 +100,7 @@
 
         <hr class="article-divider" />
 
-        <h2>Project Architecture</h2>
+        <h2>How It All Fits Together</h2>
 
         <div class="code-block">
           <div class="code-block-header"><span>Architecture Overview</span></div>
@@ -121,54 +121,45 @@ CloudWatch — CPU, Network, Disk metrics</pre>
 
         <hr class="article-divider" />
 
-        <h2>Step 1 — Creating the Security Group</h2>
-        <p>A security group is the first line of defence for any EC2 instance — it acts as a virtual firewall controlling inbound and outbound traffic at the instance level. I created a dedicated security group named <span class="code-inline">Project2-web-server-sg</span> with three inbound rules:</p>
-        <ul>
-          <li><strong>SSH (port 22)</strong> — restricted to My IP only for secure remote access</li>
-          <li><strong>HTTP (port 80)</strong> — open to <span class="code-inline">0.0.0.0/0</span> for public web access</li>
-          <li><strong>HTTPS (port 443)</strong> — open to <span class="code-inline">0.0.0.0/0</span> for future SSL traffic</li>
-        </ul>
-        <p>Restricting SSH to My IP rather than opening it to the world is a basic but critical security practice. If your IP changes, you update the rule — you never expose port 22 to everyone.</p>
+        <h2>Step 1 — Building the Security Group</h2>
+        <p>Before touching the instance itself, I created a security group. This is basically the firewall that sits in front of your EC2 instance and decides what traffic gets in and what doesn't. I named it <span class="code-inline">Project2-web-server-sg</span> and added three inbound rules to cover what I needed:</p>
+        <p>SSH on port 22, but only from my own IP address. HTTP on port 80, open to anyone. And HTTPS on port 443, also open, for when I eventually add SSL. That SSH restriction is something I've seen overlooked a lot — opening port 22 to the whole internet is a quick way to get your server hammered by bots. Even if your key pair is secure, there's no reason to expose it widely.</p>
 
         <div class="screenshot-grid">
           <figure>
-            <img src="../assets/images/blog/project2/image 1.jpg" alt="Creating the security group in AWS Console" loading="lazy" />
-            <figcaption>Security group creation form — name, description, VPC, and SSH inbound rule configured</figcaption>
+            <img src="../assets/images/blog/project2/image 1.jpeg" alt="Creating the security group in AWS Console" loading="lazy" />
+            <figcaption>Security group creation — name, description, VPC, and SSH restricted to My IP</figcaption>
           </figure>
           <figure>
             <img src="../assets/images/blog/project2/image 2.jpeg" alt="Security group created successfully" loading="lazy" />
-            <figcaption>Security group created — 3 inbound permission entries confirmed (SSH, HTTP, HTTPS)</figcaption>
+            <figcaption>Security group created with 3 inbound permission entries confirmed</figcaption>
           </figure>
         </div>
 
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
-          <div><strong>Best Practice:</strong> Always create a dedicated security group per project or workload. Sharing security groups across multiple instances makes it harder to apply least-privilege rules and audit access.</div>
+          <div><strong>Worth knowing:</strong> Create a separate security group for each project or workload. Sharing one security group across multiple instances makes permissions messy and hard to audit later.</div>
         </div>
 
         <hr class="article-divider" />
 
-        <h2>Step 2 — Creating the IAM Role</h2>
-        <p>Instead of embedding credentials in the server, I attached an IAM role to the EC2 instance. This is the AWS-recommended approach — the instance inherits permissions automatically through the instance profile, with no long-lived access keys required.</p>
-        <p>The role <span class="code-inline">Project2-EC2-Role</span> was created with two managed policies attached:</p>
-        <ul>
-          <li><span class="code-inline">CloudWatchAgentServerPolicy</span> — allows the instance to push metrics and logs to CloudWatch</li>
-          <li><span class="code-inline">AmazonSSMManagedInstanceCore</span> — enables Session Manager for browser-based terminal access</li>
-        </ul>
+        <h2>Step 2 — Setting Up the IAM Role</h2>
+        <p>This was the part I was most curious about going in. The instinct for a lot of people learning AWS is to just give an instance an access key — copy the credentials into a config file and move on. That approach works, but it's the wrong way to do it. If those credentials ever leak, you have a serious problem.</p>
+        <p>The right approach is an IAM role attached directly to the instance. The instance gets temporary credentials automatically, rotated by AWS behind the scenes, and you never have to manage long-lived keys. For this project, the role <span class="code-inline">Project2-EC2-Role</span> needed two things: permission to push metrics to CloudWatch, and permission to connect through Session Manager so I wouldn't need to expose SSH at all for day-to-day access.</p>
 
         <img src="../assets/images/blog/project2/image 3.jpeg" alt="IAM Role Project2-EC2-Role created" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">IAM Roles console — Project2-EC2-Role created and visible with trusted entity set to AWS Service: ec2</p>
+        <p class="screenshot-caption">IAM Roles page showing Project2-EC2-Role created with trusted entity set to AWS Service: ec2</p>
 
         <div class="article-callout warning">
           <i class="fas fa-triangle-exclamation"></i>
-          <div><strong>Security Note:</strong> Never attach <span class="code-inline">AdministratorAccess</span> to an EC2 role. Always follow the principle of least privilege — grant only the specific permissions the instance actually needs.</div>
+          <div><strong>Keep in mind:</strong> Never attach <span class="code-inline">AdministratorAccess</span> to an EC2 role. Only grant the permissions the instance actually needs to do its job — nothing more.</div>
         </div>
 
         <hr class="article-divider" />
 
         <h2>Step 3 — Creating the Key Pair</h2>
-        <p>For SSH access, I created an RSA key pair named <span class="code-inline">project2-key</span> in <span class="code-inline">.pem</span> format. The private key is downloaded once at creation and must be stored securely — AWS does not store it and it cannot be recovered if lost.</p>
-        <p>After downloading, SSH access requires setting correct file permissions:</p>
+        <p>Even with Session Manager available, I still created a key pair. It's good practice to have SSH access as a fallback, and the process itself is worth understanding. I created an RSA key pair named <span class="code-inline">project2-key</span> in <span class="code-inline">.pem</span> format — AWS downloads it once, and if you lose it, there's no way to recover it. It lives on your machine and nowhere else.</p>
+        <p>When you actually use it, you set the file permissions before connecting:</p>
 
         <div class="code-block">
           <div class="code-block-header"><span>SSH Access</span></div>
@@ -181,18 +172,9 @@ ssh -i project2-key.pem ubuntu@&lt;PUBLIC_IP&gt;</pre>
 
         <hr class="article-divider" />
 
-        <h2>Step 4 — Launching the EC2 Instance</h2>
-        <p>With the prerequisite resources in place, I launched the EC2 instance configured as follows:</p>
-        <ul>
-          <li><strong>Name:</strong> <span class="code-inline">project2-web-server</span></li>
-          <li><strong>AMI:</strong> Ubuntu Server 22.04 LTS</li>
-          <li><strong>Instance type:</strong> t3.micro (within free tier)</li>
-          <li><strong>Key pair:</strong> project2-key</li>
-          <li><strong>Security group:</strong> Project2-web-server-sg</li>
-          <li><strong>IAM instance profile:</strong> Project2-EC2-Role</li>
-          <li><strong>User data:</strong> Nginx installation and startup script</li>
-        </ul>
-        <p>The user data script runs automatically at first boot, installing Nginx and configuring it to serve on port 80 — no manual SSH session required for the initial deployment.</p>
+        <h2>Step 4 — Launching the Instance</h2>
+        <p>With the security group, IAM role, and key pair ready, launching the instance was relatively quick. Ubuntu 22.04 LTS on a t3.micro, everything wired up in the network settings, and then the most interesting part — the user data script.</p>
+        <p>User data runs automatically on first boot, as root, before anything else happens. I used it to install and start Nginx so the web server would be live the moment the instance became reachable, without any manual steps from me:</p>
 
         <div class="code-block">
           <div class="code-block-header"><span>user-data.sh (simplified)</span></div>
@@ -204,80 +186,69 @@ systemctl enable nginx</pre>
         </div>
 
         <img src="../assets/images/blog/project2/image 5.jpeg" alt="EC2 instance launch success" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Instance launch success — instance ID i-03e584273bbfa8ded initiated successfully</p>
+        <p class="screenshot-caption">Instance launch success — instance ID i-03e584273bbfa8ded confirmed</p>
 
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
-          <div><strong>Key Insight:</strong> EC2 user data scripts are a simple but powerful form of Infrastructure as Code. The server configures itself at launch — no manual intervention needed after clicking "Launch instance".</div>
+          <div><strong>The big idea:</strong> User data is a simple but powerful form of Infrastructure as Code. The server builds itself at launch. No SSH session required, no manual setup, no room for human error during deployment.</div>
         </div>
 
         <hr class="article-divider" />
 
-        <h2>Step 5 — Instance Running and Web Server Live</h2>
-        <p>After a few minutes, the instance reached the Running state with 3/3 status checks passed. I copied the Public IPv4 address and opened it in a browser to confirm the Nginx server was live and serving traffic.</p>
+        <h2>Step 5 — The Server Goes Live</h2>
+        <p>A few minutes after launch, the instance hit the Running state and showed 3/3 status checks passed. I copied the public IP, opened a browser tab, and there it was — the Nginx welcome page loading over HTTP. The user data script had done exactly what it was supposed to do.</p>
 
         <img src="../assets/images/blog/project2/image 8.jpeg" alt="EC2 instance running with 3/3 status checks" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">EC2 Instances dashboard — project2-web-server running, t3.micro, 3/3 checks passed, Public IP: 52.91.82.33</p>
+        <p class="screenshot-caption">EC2 dashboard — project2-web-server running, t3.micro, 3/3 checks passed, Public IP: 52.91.82.33</p>
 
         <img src="../assets/images/blog/project2/image 6.jpeg" alt="Nginx welcome page live on EC2 public IP" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Nginx default page live at http://52.91.82.33 — web server installed and working via user data automation</p>
+        <p class="screenshot-caption">Nginx default page live at http://52.91.82.33 — web server up and serving from first boot</p>
 
         <div class="article-callout success">
           <i class="fas fa-circle-check"></i>
-          <div><strong>Milestone:</strong> The server was live and serving HTTP traffic within minutes of launch — with zero manual SSH setup. The entire Nginx deployment was automated through the user data script.</div>
+          <div><strong>That feeling:</strong> Watching a server come online and serve traffic on its own, without touching it after clicking launch, was genuinely satisfying. That's what automation is supposed to feel like.</div>
         </div>
 
         <hr class="article-divider" />
 
-        <h2>Step 6 — Monitoring with CloudWatch</h2>
-        <p>With the IAM role granting CloudWatch permissions, the instance automatically reported metrics to CloudWatch. I reviewed two sets of monitoring data from the EC2 console:</p>
-        <ul>
-          <li><strong>CPU utilization</strong> — peaked at 18.3% during initial startup, then settled</li>
-          <li><strong>Network in/out</strong> — showed 42.86 MB inbound during the user data install phase</li>
-          <li><strong>CPU credit balance and usage</strong> — visible for the t3.micro burstable instance type</li>
-          <li><strong>Network packet counts</strong> — confirmed HTTP traffic reaching the server</li>
-        </ul>
+        <h2>Step 6 — Checking CloudWatch</h2>
+        <p>Once the server was live, I pulled up CloudWatch to see what the numbers looked like. CPU had spiked to around 18% during the initial boot and user data execution, then dropped right off once everything settled. Network in showed 42 MB during that same window — the apt package downloads for Nginx. After that, traffic was just the occasional test hit I was making from the browser.</p>
+        <p>None of this was surprising, but seeing it in actual graphs made the boot sequence feel tangible. You could literally watch the instance start up.</p>
 
         <div class="screenshot-grid">
           <figure>
             <img src="../assets/images/blog/project2/image 10.jpeg" alt="CloudWatch CPU utilization and network metrics" loading="lazy" />
-            <figcaption>CloudWatch metrics — CPU utilization at 18.3%, network in 42.86 MB, network out 99.06 KB</figcaption>
+            <figcaption>CloudWatch — CPU at 18.3% during boot, network in 42.86 MB during Nginx install</figcaption>
           </figure>
           <figure>
             <img src="../assets/images/blog/project2/image 9.jpeg" alt="CloudWatch CPU credit and network packet metrics" loading="lazy" />
-            <figcaption>CloudWatch metrics — CPU credit usage and balance, network packet count visible for the instance</figcaption>
+            <figcaption>CloudWatch — CPU credit usage, credit balance, and network packet count for the t3.micro</figcaption>
           </figure>
         </div>
 
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
-          <div><strong>Why CloudWatch Matters:</strong> Without monitoring you are flying blind. Even a simple web server needs visibility into CPU usage, network traffic, and status checks to detect problems early and plan capacity correctly.</div>
+          <div><strong>Why this matters:</strong> You can't manage what you can't see. Even a simple server needs visibility into what it's actually doing so you can catch problems early and understand your baseline before anything goes wrong.</div>
         </div>
 
         <hr class="article-divider" />
 
-        <h2>Challenges I Encountered</h2>
-        <p>A few things required troubleshooting during this project:</p>
-        <ul>
-          <li>The instance initially showed 2/2 status checks — one check lagged behind; waiting two minutes resolved it</li>
-          <li>I temporarily forgot to enable auto-assign public IP, which would have left the instance unreachable from the internet</li>
-          <li>The user data script runs as root, so package paths and permissions needed to be considered carefully</li>
-          <li>SSH access required setting <span class="code-inline">chmod 400</span> on the <span class="code-inline">.pem</span> file — without this, the SSH client rejects the key</li>
-        </ul>
-        <p>Each of these small friction points deepened my understanding of how EC2 networking, IAM, and Linux permissions work together.</p>
+        <h2>What Didn't Go Smoothly</h2>
+        <p>I initially forgot to enable auto-assign public IP, which would have left the instance sitting in the VPC with no way to reach it from the internet. Caught it before launching, thankfully. The status checks also showed 2/2 for a minute before settling on the correct 3/3 — just a timing lag, but it's the kind of thing that can make you panic if you haven't seen it before.</p>
+        <p>The other thing that caught me was the SSH key permissions. The first time I tried to connect, the SSH client threw an error because the <span class="code-inline">.pem</span> file was too open. Running <span class="code-inline">chmod 400</span> on it fixed it immediately, but it's not obvious if you've never seen that error before.</p>
 
         <hr class="article-divider" />
 
-        <h2>Skills I Gained From This Project</h2>
+        <h2>What I Took Away From This</h2>
 
         <div class="skills-gained-grid">
           <div class="skills-gained-card">
-            <h4><i class="fas fa-server"></i> EC2 &amp; Compute</h4>
+            <h4><i class="fas fa-server"></i> EC2 and Compute</h4>
             <ul>
-              <li>Instance launch configuration</li>
+              <li>Instance launch and configuration</li>
               <li>AMI selection</li>
               <li>User data automation</li>
-              <li>Instance types and t3 bursting</li>
+              <li>t3 burst instance behaviour</li>
             </ul>
           </div>
           <div class="skills-gained-card">
@@ -286,7 +257,7 @@ systemctl enable nginx</pre>
               <li>Security group rules</li>
               <li>Least-privilege IAM roles</li>
               <li>SSH key management</li>
-              <li>Instance profile best practices</li>
+              <li>Instance profile patterns</li>
             </ul>
           </div>
           <div class="skills-gained-card">
@@ -298,10 +269,10 @@ systemctl enable nginx</pre>
             </ul>
           </div>
           <div class="skills-gained-card">
-            <h4><i class="fas fa-terminal"></i> Linux &amp; Automation</h4>
+            <h4><i class="fas fa-terminal"></i> Linux and Automation</h4>
             <ul>
-              <li>Ubuntu server administration</li>
-              <li>Nginx web server setup</li>
+              <li>Ubuntu server basics</li>
+              <li>Nginx setup</li>
               <li>Bash user data scripting</li>
               <li>Session Manager access</li>
             </ul>
@@ -310,31 +281,18 @@ systemctl enable nginx</pre>
 
         <hr class="article-divider" />
 
-        <h2>Key Takeaways</h2>
-        <p>This project reinforced that cloud compute is not just about launching a virtual machine. Every EC2 instance sits at the intersection of networking (security groups), identity (IAM roles), automation (user data), and observability (CloudWatch). Getting each layer right is what separates a properly configured server from a misconfigured one.</p>
+        <h2>The Bigger Picture</h2>
+        <p>What this project made clear is that EC2 is never just a virtual machine. Every instance sits at the intersection of networking, identity, automation, and observability. Get any one of those layers wrong and things either don't work or aren't secure. Getting them all right, even on something as simple as a single web server, is good practice for everything that comes later.</p>
 
         <div class="article-callout success">
           <i class="fas fa-circle-check"></i>
-          <div><strong>Takeaway:</strong> EC2 user data is one of the most practical skills in cloud engineering. Automating server configuration at launch removes human error from the deployment process and makes infrastructure reproducible.</div>
+          <div><strong>Honest takeaway:</strong> User data automation was the most satisfying part of this whole project. Watching a server configure and serve traffic on its own after launch is the moment where Infrastructure as Code stops being a concept and starts feeling real.</div>
         </div>
 
         <hr class="article-divider" />
 
-        <h2>What's Next?</h2>
-        <p>Building on this foundation, the next projects in my AWS journey will cover:</p>
-        <ul>
-          <li>VPC architecture — subnets, route tables, NAT Gateway, and network ACLs</li>
-          <li>Load balancing and EC2 Auto Scaling with CloudWatch alarms</li>
-          <li>IAM security deep-dive — least privilege, MFA enforcement, and SCPs</li>
-          <li>Serverless APIs with Lambda, API Gateway, and DynamoDB</li>
-          <li>CI/CD pipelines with GitHub Actions and AWS ECS</li>
-        </ul>
-
-        <hr class="article-divider" />
-
-        <h2>Conclusion</h2>
-        <p>Project 02 moved me from static hosting into real compute infrastructure. Launching a hardened EC2 instance — with a proper security group, scoped IAM role, and automated Nginx deployment — gave me hands-on experience with the same patterns used in production cloud environments. Every misconfiguration I encountered and fixed was a lesson that no amount of reading could have provided.</p>
-        <p>The server was running, monitored, and secure. On to the next project.</p>
+        <h2>What's Next</h2>
+        <p>From here the natural progression is to go deeper into networking with a proper VPC setup, then move into load balancing and Auto Scaling. But first, Project 03 — which takes a completely different direction and leaves servers behind entirely.</p>
 
         <!-- Tech Stack Summary -->
         <div class="article-tech-stack">

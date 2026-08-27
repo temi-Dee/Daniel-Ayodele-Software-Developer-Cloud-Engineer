@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Serverless Contact Form with Lambda and SES | Daniel Ayodele</title>
+  <meta name="description" content="How I built a fully serverless contact form using AWS Lambda, API Gateway, and SES — no servers, just an event-driven pipeline from browser to inbox." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="icon" type="image/png" href="../assets/logo.png" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/blog.css" />
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container container">
+      <a href="../index.html" class="nav-logo">
+        <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        <span class="nav-tagline">AWS Cloud Engineer<span class="nav-tagline-sep">|</span>Cybersecurity</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../index.html#projects">Projects</a></li>
+        <li><a href="index.html" class="nav-active">Blog</a></li>
+        <li><a href="../index.html#about">About</a></li>
+        <li><a href="../contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light mode">
+          <i class="fas fa-sun" id="themeIcon"></i>
+        </button>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== ARTICLE HERO ===== -->
+  <section class="article-hero">
+    <div class="container article-hero-inner">
+      <div class="article-meta-top">
+        <span class="blog-cat-pill"><i class="fab fa-aws"></i> AWS Cloud Engineering</span>
+        <span class="article-read-time"><i class="fas fa-clock"></i> 10 min read</span>
+      </div>
+      <h1>Project 03 — Serverless Contact Form with Lambda and SES</h1>
+      <p class="article-subtitle">How I built a fully serverless email pipeline using API Gateway, AWS Lambda, and Amazon SES — no EC2, no servers to manage, just a function that runs when someone clicks Submit.</p>
+      <div class="article-author">
+        <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-avatar" />
+        <div>
+          <strong>Daniel Ayodele</strong>
+          <span>AWS Cloud Engineer &amp; Cybersecurity Enthusiast</span>
+        </div>
+      </div>
+      <div class="article-tags">
+        <span>Lambda</span><span>API Gateway</span><span>SES</span><span>IAM</span><span>Node.js</span><span>CORS</span><span>CloudWatch</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ARTICLE BODY ===== -->
+  <article class="article-body">
+    <div class="container article-layout">
+
+      <!-- Main Content -->
+      <div class="article-content">
+
+        <p class="article-lead">Projects 01 and 02 both involved infrastructure you could see and touch — an S3 bucket, a CloudFront distribution, an EC2 instance running Nginx. Project 03 took a different turn. No servers. No instances. No SSH. Just code that runs in response to an HTTP request and disappears the moment it's done. This is what serverless actually means, and building it from scratch made the concept click in a way that reading about it never did.</p>
+
+        <hr class="article-divider" />
+
+        <h2>The Problem Worth Solving</h2>
+        <p>A contact form sounds trivial, but think about what it actually needs to do. A user fills in their name, email, and message. They click Submit. Something needs to receive that data, validate it, and send it as an email to someone. The traditional answer is a server running PHP or Node.js sitting there 24/7 waiting for submissions.</p>
+        <p>The serverless answer is cleaner: an API endpoint triggers a Lambda function only when a form is submitted. Lambda validates the input and hands it to Amazon SES to send the email. Nothing runs when there's nothing to do. You pay per execution, not per hour.</p>
+
+        <hr class="article-divider" />
+
+        <h2>Services and Technologies Used</h2>
+
+        <div class="article-table-wrap">
+          <table class="article-table">
+            <thead>
+              <tr><th>AWS Service</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="code-inline">Amazon SES</span></td><td>Sends the actual email when Lambda calls it</td></tr>
+              <tr><td><span class="code-inline">AWS Lambda</span></td><td>The function that validates the form data and triggers SES</td></tr>
+              <tr><td><span class="code-inline">Amazon API Gateway</span></td><td>The HTTP endpoint the contact form POSTs to</td></tr>
+              <tr><td><span class="code-inline">IAM Role</span></td><td>Grants Lambda permission to use SES and write to CloudWatch</td></tr>
+              <tr><td><span class="code-inline">Amazon CloudWatch</span></td><td>Logs every function execution for debugging</td></tr>
+              <tr><td><span class="code-inline">Node.js 18.x</span></td><td>The Lambda runtime — function code written in JavaScript</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>How It All Connects</h2>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>Architecture Flow</span></div>
+          <pre>Static HTML Contact Form
+        │  POST /contact (JSON payload)
+        ▼
+Amazon API Gateway (REST API — prod stage)
+        │  Lambda proxy integration
+        ▼
+AWS Lambda — ContactFormHandler (Node.js 18.x)
+        │  Validate input → call SES
+        ▼
+Amazon SES — SendEmail
+        │
+        ▼
+Email delivered to recipient inbox
+        │
+        ▼ (parallel)
+CloudWatch Logs — full execution log</pre>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 1 — Verifying the Email in SES</h2>
+        <p>Before Lambda can send any email, SES needs to know that you actually own the address you're sending from. In sandbox mode — which is where every new account starts — both the sender and the recipient address have to be verified. You add an email identity, AWS sends a verification link to that inbox, and once you click it, SES trusts the address.</p>
+        <p>It's a small step but an easy one to trip over if you forget. I tried testing the function before clicking the verification link on my first attempt, got an error, then realised what I'd missed.</p>
+
+        <img src="../assets/images/blog/project 3/image 1.jpeg" alt="SES email identity verification" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Amazon SES — verified email identity confirmed and ready to send</p>
+
+        <div class="article-callout info">
+          <i class="fas fa-lightbulb"></i>
+          <div><strong>Sandbox vs production:</strong> In sandbox mode you can only send to verified addresses. When you're ready to send to real users, you apply for SES production access through the console. For testing, sandbox is fine.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 2 — The IAM Role for Lambda</h2>
+        <p>Lambda functions don't have permissions by default. You have to explicitly tell AWS what the function is allowed to do, and you do that through an IAM role. The role <span class="code-inline">ContactFormLambdaRole</span> needed two things: the basic Lambda execution policy so it could write logs to CloudWatch, and an inline policy granting it permission to call <span class="code-inline">ses:SendEmail</span> and <span class="code-inline">ses:SendRawEmail</span>.</p>
+        <p>Getting this right before creating the function saves a lot of back-and-forth. If the role is missing permissions, Lambda will execute but SES will reject the call and you'll get a permissions error buried in the CloudWatch logs.</p>
+
+        <img src="../assets/images/blog/project 3/image 2.jpeg" alt="IAM role ContactFormLambdaRole created" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">IAM role ContactFormLambdaRole created with Lambda as trusted entity and SES send permissions attached</p>
+
+        <div class="article-callout warning">
+          <i class="fas fa-triangle-exclamation"></i>
+          <div><strong>Scope it tightly:</strong> The SES policy here uses <span class="code-inline">"Resource": "*"</span> for simplicity, but in a production setup you'd lock it down to a specific verified identity ARN so the function can only send from one address.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 3 — Creating the Lambda Function</h2>
+        <p>With the role ready, I created the Lambda function <span class="code-inline">ContactFormHandler</span> on Node.js 18.x, attached the IAM role, and then wrote the handler code directly in the console editor. The function does three things: parses the incoming JSON body from API Gateway, runs basic validation on the name, email, and message fields, then calls SES to send the email if everything checks out.</p>
+        <p>Two environment variables handle the email addresses — <span class="code-inline">SENDER_EMAIL</span> and <span class="code-inline">RECIPIENT_EMAIL</span> — so the function itself contains no hardcoded values. Change the addresses without touching the code.</p>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>lambda/index.js (core logic)</span></div>
+          <pre>const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+const ses = new SESClient({ region: process.env.AWS_REGION });
+
+exports.handler = async (event) => {
+  const { name, email, message } = JSON.parse(event.body);
+
+  if (!name || !email || !message) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing fields" }) };
+  }
+
+  await ses.send(new SendEmailCommand({
+    Source: process.env.SENDER_EMAIL,
+    Destination: { ToAddresses: [process.env.RECIPIENT_EMAIL] },
+    Message: {
+      Subject: { Data: `Contact form: ${name}` },
+      Body: { Text: { Data: `From: ${name} (${email})\n\n${message}` } }
+    }
+  }));
+
+  return { statusCode: 200, body: JSON.stringify({ success: true }) };
+};</pre>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="../assets/images/blog/project 3/image 3.jpeg" alt="Lambda function created in AWS Console" loading="lazy" />
+            <figcaption>Lambda function ContactFormHandler created, Node.js 18.x runtime, IAM role attached</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 3/image 4.jpeg" alt="Lambda environment variables configured" loading="lazy" />
+            <figcaption>Environment variables set — SENDER_EMAIL and RECIPIENT_EMAIL configured without touching the code</figcaption>
+          </figure>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 4 — Setting Up API Gateway</h2>
+        <p>Lambda on its own has no public URL. API Gateway is what gives it one. I created a REST API named <span class="code-inline">ContactFormAPI</span>, added a <span class="code-inline">/contact</span> resource, and created a POST method with Lambda proxy integration enabled. That proxy setting is important — it passes the full HTTP request object to Lambda as-is, which is what lets the function read the form data from <span class="code-inline">event.body</span>.</p>
+        <p>The other thing that needed setting up was CORS. Because the form is on a static HTML page hosted somewhere else (a different origin), the browser will block the request unless the API returns the right headers. I added an OPTIONS method with the correct <span class="code-inline">Access-Control-Allow-Origin</span> headers, deployed to a <span class="code-inline">prod</span> stage, and the endpoint was live.</p>
+
+        <img src="../assets/images/blog/project 3/image 5.jpeg" alt="API Gateway REST API configured" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">API Gateway — ContactFormAPI with /contact resource, POST method, Lambda proxy integration, and CORS configured</p>
+
+        <div class="article-callout info">
+          <i class="fas fa-lightbulb"></i>
+          <div><strong>CORS explained simply:</strong> When your HTML page at domain A tries to call an API at domain B, the browser checks whether domain B allows it. CORS headers are how domain B says yes. Forgetting them produces a confusing error that looks nothing like a permissions problem.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 5 — Testing It End to End</h2>
+        <p>Once the API was deployed, I tested it with a curl request before even touching the HTML form. That's a habit worth building — verify the backend works on its own before trying to debug both the frontend and backend at the same time.</p>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>Test with curl</span></div>
+          <pre>curl -X POST "https://&lt;API_ID&gt;.execute-api.us-east-1.amazonaws.com/prod/contact" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com","message":"Hello from Project 3"}'</pre>
+        </div>
+
+        <p>The response came back with <span class="code-inline">"success": true</span> and the email landed in the inbox within seconds. That's the moment the whole thing snaps into place — a static HTML page, an API endpoint, a function, and an email service all talking to each other without a single server involved.</p>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="../assets/images/blog/project 3/image 6.jpeg" alt="Lambda test execution successful" loading="lazy" />
+            <figcaption>Lambda test execution returning success response — function ran and SES call completed</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 3/image 7.jpeg" alt="CloudWatch logs showing Lambda execution" loading="lazy" />
+            <figcaption>CloudWatch Logs — full execution trace for the ContactFormHandler invocation</figcaption>
+          </figure>
+        </div>
+
+        <div class="article-callout success">
+          <i class="fas fa-circle-check"></i>
+          <div><strong>The moment it clicks:</strong> Watching an email arrive that was triggered by a curl command — passing through API Gateway, through a Lambda function, through SES — is when serverless stops being an abstract concept and becomes something real you understand.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>What Tripped Me Up</h2>
+        <p>A few things needed sorting out during this project. The first was the SES verification — easy to miss if you're moving quickly. The second was CORS. I had the POST method working perfectly from curl, but when I tested from the browser form, it was blocked. The browser sends an OPTIONS preflight request before the actual POST, and I hadn't set up the OPTIONS method correctly. Once that was fixed, the browser requests went through cleanly.</p>
+        <p>The third thing was Lambda permissions. At one point I accidentally attached the wrong role and the function could execute but couldn't call SES. The error came back as an AccessDenied exception in CloudWatch. Having logs available made it straightforward to diagnose — without them, that kind of error is very hard to chase down.</p>
+
+        <hr class="article-divider" />
+
+        <h2>What This Project Taught Me</h2>
+
+        <div class="skills-gained-grid">
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-bolt"></i> Serverless Thinking</h4>
+            <ul>
+              <li>Event-driven architecture</li>
+              <li>Lambda function lifecycle</li>
+              <li>Pay-per-execution model</li>
+              <li>Cold start awareness</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-plug"></i> API Gateway</h4>
+            <ul>
+              <li>REST API creation</li>
+              <li>Lambda proxy integration</li>
+              <li>CORS configuration</li>
+              <li>Stage deployment</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-envelope"></i> SES and Email</h4>
+            <ul>
+              <li>Identity verification</li>
+              <li>Programmatic email sending</li>
+              <li>Sandbox vs production</li>
+              <li>Sender reputation basics</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-shield-halved"></i> IAM and Security</h4>
+            <ul>
+              <li>Lambda execution roles</li>
+              <li>Inline SES policies</li>
+              <li>Environment variable usage</li>
+              <li>CloudWatch log access</li>
+            </ul>
+          </div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Why Serverless Changes How You Think</h2>
+        <p>After two projects managing infrastructure — an S3 bucket with a CloudFront distribution, then an EC2 server — going serverless felt like a mental shift. There's no instance to worry about patching. No server to monitor for uptime. No capacity to pre-provision. You write a function, give it permissions, and connect it to a trigger. AWS handles everything else.</p>
+        <p>For a contact form that might receive ten submissions a day, running a server 24/7 to handle that load is genuinely wasteful. Lambda costs next to nothing for that kind of traffic and requires zero maintenance. That's the tradeoff serverless is making, and for the right use cases it's a compelling one.</p>
+
+        <div class="article-callout success">
+          <i class="fas fa-circle-check"></i>
+          <div><strong>Real takeaway:</strong> The hardest part of this project wasn't the code — the handler is maybe 30 lines. It was understanding how API Gateway, Lambda, SES, IAM, and CORS all connect and in what order to set them up. Getting that sequence right is the skill.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>What Comes Next</h2>
+        <p>Project 03 introduced the core serverless building blocks. From here the natural progression is to go deeper — adding DynamoDB to store form submissions, using Lambda layers to manage shared dependencies, and eventually building a full REST API with multiple endpoints. But those are later projects. For now, the pipeline works, the emails arrive, and I understand exactly why.</p>
+
+        <!-- Tech Stack Summary -->
+        <div class="article-tech-stack">
+          <h4>Tech Stack</h4>
+          <div class="card-tech">
+            <span>Node.js 18.x</span><span>Lambda</span><span>API Gateway</span>
+            <span>Amazon SES</span><span>IAM</span><span>CloudWatch</span>
+          </div>
+        </div>
+
+        <!-- Article Footer Actions -->
+        <div class="article-footer-actions">
+          <a href="index.html" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to Blog</a>
+          <a href="blog-post-2.html" class="btn btn-outline"><i class="fas fa-book-open"></i> Read Project 02</a>
+          <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20read%20your%20Lambda%20article%20and%20would%20like%20to%20connect."
+            target="_blank" rel="noopener" class="btn btn-primary">
+            <i class="fab fa-whatsapp"></i> Discuss on WhatsApp
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Sidebar TOC -->
+      <aside class="article-sidebar">
+        <div class="toc-card">
+          <h4><i class="fas fa-list"></i> Table of Contents</h4>
+          <ol class="toc-list">
+            <li><a href="#" onclick="return false;">The Problem Worth Solving</a></li>
+            <li><a href="#" onclick="return false;">Services Used</a></li>
+            <li><a href="#" onclick="return false;">Architecture</a></li>
+            <li><a href="#" onclick="return false;">Step 1 — SES Verification</a></li>
+            <li><a href="#" onclick="return false;">Step 2 — IAM Role</a></li>
+            <li><a href="#" onclick="return false;">Step 3 — Lambda Function</a></li>
+            <li><a href="#" onclick="return false;">Step 4 — API Gateway</a></li>
+            <li><a href="#" onclick="return false;">Step 5 — Testing</a></li>
+            <li><a href="#" onclick="return false;">What Tripped Me Up</a></li>
+            <li><a href="#" onclick="return false;">What I Learned</a></li>
+            <li><a href="#" onclick="return false;">What Comes Next</a></li>
+          </ol>
+        </div>
+
+        <div class="author-card">
+          <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-card-avatar" />
+          <h4>Daniel Ayodele</h4>
+          <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast documenting my cloud journey one project at a time.</p>
+          <div class="author-socials">
+            <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"><i class="fab fa-linkedin-in"></i></a>
+            <a href="https://github.com/temi-Dee" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
+            <a href="mailto:ayodeledaniel0240@gmail.com"><i class="fas fa-envelope"></i></a>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </article>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="../index.html" class="nav-logo">
+          <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        </a>
+        <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast building secure, scalable cloud solutions.</p>
+      </div>
+      <div class="footer-nav">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="../index.html#projects">Projects</a></li>
+          <li><a href="index.html">Blog</a></li>
+          <li><a href="../contact.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-connect">
+        <h4>Connect</h4>
+        <div class="footer-socials">
+          <a href="https://github.com/temi-Dee" target="_blank" rel="noopener" aria-label="GitHub"><i class="fab fa-github"></i></a>
+          <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+          <a href="mailto:ayodeledaniel0240@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom container">
+      <p>&copy; 2026 Daniel Ayodele | AWS Cloud Engineer &amp; Cybersecurity Enthusiast</p>
+      <div class="footer-links">
+        <a href="https://github.com/temi-Dee" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener">LinkedIn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WhatsApp Float -->
+  <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect."
+     class="wa-float" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+    <span class="wa-tooltip">Chat on WhatsApp</span>
+  </a>
+
+  <script src="../js/script.js"></script>
+  <script src="../js/blog.js"></script>
+</body>
+</html>
