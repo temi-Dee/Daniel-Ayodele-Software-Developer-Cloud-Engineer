@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RDS PostgreSQL with Automated Backups | Daniel Ayodele</title>
+  <meta name="description"
+    content="How I built a private PostgreSQL database on Amazon RDS with Multi-AZ redundancy, automated backups, a bastion host, and CloudWatch alarms." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="icon" type="image/png" href="../assets/logo.png" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/blog.css" />
+</head>
+
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container container">
+      <a href="../index.html" class="nav-logo">
+        <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        <span class="nav-tagline">AWS Cloud Engineer<span class="nav-tagline-sep">|</span>Cybersecurity</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../index.html#projects">Projects</a></li>
+        <li><a href="index.html" class="nav-active">Blog</a></li>
+        <li><a href="../index.html#about">About</a></li>
+        <li><a href="../contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light mode">
+          <i class="fas fa-sun" id="themeIcon"></i>
+        </button>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== ARTICLE HERO ===== -->
+  <section class="article-hero">
+    <div class="container article-hero-inner">
+      <div class="article-meta-top">
+        <span class="blog-cat-pill"><i class="fas fa-flask"></i> AWS LABS</span>
+        <span class="article-read-time"><i class="fas fa-clock"></i> 12 min read</span>
+      </div>
+      <h1>Project 04 — RDS PostgreSQL with Automated Backups</h1>
+      <p class="article-subtitle">How I built a private PostgreSQL database on Amazon RDS with Multi-AZ redundancy,
+        automated backups, a bastion host, and CloudWatch alarms.</p>
+      <div class="article-author">
+        <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-avatar" />
+        <div>
+          <strong>Daniel Ayodele</strong>
+          <span>AWS Cloud Engineer &amp; Cybersecurity Enthusiast</span>
+        </div>
+      </div>
+      <div class="article-tags">
+        <span>Amazon RDS</span><span>PostgreSQL</span><span>VPC</span><span>Multi-AZ</span><span>EC2</span><span>CloudWatch</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ARTICLE BODY ===== -->
+  <article class="article-body">
+    <div class="container article-layout">
+
+      <!-- Main Content -->
+      <div class="article-content">
+
+        <p class="article-lead">Projects 01 through 03 moved from static hosting, to a Linux server, to a serverless
+          workflow. Project 04 brought me back to infrastructure, but with a different responsibility: storing data
+          that needs to survive. I wanted a database that was private by default, backed up automatically, and able to
+          fail over without me rebuilding a server. Amazon RDS was the right tool for that job.</p>
+
+        <hr class="article-divider" />
+
+        <h2>What I Was Building</h2>
+        <p>The goal was a managed PostgreSQL database that application traffic could reach privately, while
+          administrative access came through a small bastion host in a public subnet. The database itself would sit in
+          two private subnets in different Availability Zones, with Multi-AZ enabled for high availability.</p>
+        <p>That sounds like a lot of pieces, but each one has a clear job. The VPC provides the boundary, security groups
+          control who can talk to what, RDS manages the database, and the bastion gives me a controlled route in for
+          testing.</p>
+
+        <hr class="article-divider" />
+
+        <h2>Services and Technologies Used</h2>
+
+        <div class="article-table-wrap">
+          <table class="article-table">
+            <thead>
+              <tr>
+                <th>AWS Service</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="code-inline">Amazon RDS</span></td>
+                <td>Managed PostgreSQL database with Multi-AZ and automated backups</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Amazon VPC</span></td>
+                <td>Private network containing the database subnets</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">EC2 Bastion Host</span></td>
+                <td>Controlled administration point for connecting to PostgreSQL</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">Security Groups</span></td>
+                <td>Allow SSH only from my IP and PostgreSQL only from the bastion</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">AWS CloudWatch</span></td>
+                <td>Alarms for high CPU utilization and low free storage</td>
+              </tr>
+              <tr>
+                <td><span class="code-inline">PostgreSQL 15</span></td>
+                <td>Relational database engine tested through the psql client</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>How It All Fits Together</h2>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>Architecture Overview</span></div>
+          <pre>My workstation
+        │  SSH from my IP only
+        ▼
+EC2 Bastion Host — public subnet
+        │  PostgreSQL:5432 from bastion SG only
+        ▼
+Amazon RDS — PostgreSQL 15, private subnets
+  ├── Multi-AZ standby for automatic failover
+  ├── Storage encryption and 7-day backups
+  └── CloudWatch alarms for CPU and free storage</pre>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 1 — Creating the VPC and Subnets</h2>
+        <p>I started with a dedicated VPC named <span class="code-inline">RDS-VPC</span> using the
+          <span class="code-inline">10.0.0.0/16</span> range. The database needed subnets in two Availability Zones,
+          so I created private subnets for RDS in <span class="code-inline">us-east-1a</span> and
+          <span class="code-inline">us-east-1b</span>. I also created a separate public subnet for the bastion host.
+        </p>
+        <p>The important detail is that the database does not need a public IP. The public subnet exists for the
+          bastion, while the RDS subnet group uses only the two private subnets. That separation is the foundation of
+          the network design.</p>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="../assets/images/blog/project 4/1.jpeg" alt="RDS-VPC listed in the Amazon VPC console" loading="lazy" />
+            <figcaption>Dedicated RDS-VPC created and available for the database network</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 4/2.jpeg" alt="Private and public subnets listed in the VPC console" loading="lazy" />
+            <figcaption>Two private database subnets and a public subnet for the bastion host</figcaption>
+          </figure>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 2 — Giving the Bastion a Route Out</h2>
+        <p>To make the bastion reachable, I attached an internet gateway to the VPC and created a route table with a
+          default route to it. That route table is associated with the public subnet only. The RDS subnets stay private,
+          so there is no direct path from the internet to the database.</p>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="../assets/images/blog/project 4/3.jpeg" alt="RDS-VPC internet gateway attached in AWS" loading="lazy" />
+            <figcaption>RDS-VPC-IGW attached to the dedicated VPC</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 4/4.jpeg" alt="Public route table with a default internet gateway route" loading="lazy" />
+            <figcaption>Public-RDS-RT sends internet-bound traffic through the internet gateway</figcaption>
+          </figure>
+        </div>
+
+        <div class="article-callout info">
+          <i class="fas fa-lightbulb"></i>
+          <div><strong>Small network, clear boundaries:</strong> A public subnet is not a reason to make the database
+            public. It is simply where the controlled entry point lives. The RDS security group still decides whether
+            database traffic is allowed.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 3 — Separating SSH and Database Access</h2>
+        <p>I created two security groups: <span class="code-inline">Bastion-SG</span> and
+          <span class="code-inline">RDS-SG</span>. Bastion-SG allows SSH on port 22 from my current IP address. RDS-SG
+          allows PostgreSQL traffic on port 5432 only when the source is Bastion-SG.</p>
+        <p>That second rule is better than putting an IP address directly into the database rule. The database trusts the
+          bastion as a workload, not the whole internet or an address that may change later.</p>
+
+        <img src="../assets/images/blog/project 4/5.jpeg" alt="Bastion-SG and RDS-SG security groups in the VPC console"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Two security groups created for the project: Bastion-SG for SSH and RDS-SG for PostgreSQL</p>
+
+        <div class="article-callout warning">
+          <i class="fas fa-triangle-exclamation"></i>
+          <div><strong>Keep port 5432 private:</strong> Opening PostgreSQL to <span class="code-inline">0.0.0.0/0</span>
+            would expose the database to unnecessary scanning and attack attempts. Referencing the bastion security
+            group keeps the rule narrow.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 4 — Creating the RDS Subnet Group</h2>
+        <p>RDS uses a DB subnet group to know where it is allowed to place database resources. I added the two private
+          subnets to <span class="code-inline">rds-subnet-group</span>, one in each Availability Zone. Once AWS marked
+          the group as complete, the network layer was ready for the database instance.</p>
+
+        <img src="../assets/images/blog/project 4/6.jpeg" alt="RDS subnet group created successfully" class="project-screenshot"
+          loading="lazy" />
+        <p class="screenshot-caption">rds-subnet-group completed successfully with the private subnets selected for RDS</p>
+
+        <hr class="article-divider" />
+
+        <h2>Step 5 — Launching PostgreSQL on RDS</h2>
+        <p>For the database, I chose PostgreSQL 15, enabled storage encryption, set a seven-day backup retention
+          period, and kept public access disabled. Multi-AZ was the key setting: RDS maintains a standby in another
+          Availability Zone and handles failover if the primary becomes unavailable.</p>
+        <p>After waiting for the managed service to finish provisioning, <span class="code-inline">my-postgres-db</span>
+          reached the Available state. That was a useful reminder of the difference between launching infrastructure
+          and managing it. I did not need to install PostgreSQL, configure replication, or write backup jobs. RDS took
+          care of those operational tasks.</p>
+
+        <img src="../assets/images/blog/project 4/7.jpeg" alt="Available PostgreSQL database in the Amazon RDS console"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">my-postgres-db available in Amazon RDS, running the PostgreSQL engine</p>
+
+        <div class="article-callout success">
+          <i class="fas fa-circle-check"></i>
+          <div><strong>The useful shift:</strong> The database is still infrastructure, but I am not responsible for
+            keeping the database software alive. My responsibility is the surrounding design: network access,
+            credentials, backups, monitoring, and sensible permissions.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 6 — Connecting Through the Bastion</h2>
+        <p>Once the bastion was running, I connected to it over SSH and installed the PostgreSQL 15 client. From there,
+          the private RDS endpoint resolved normally because the bastion and database were inside the same VPC. The
+          connection used TLS, and PostgreSQL confirmed that the client was talking to the expected server version.</p>
+
+        <img src="../assets/images/blog/project 4/8.jpeg" alt="PostgreSQL client connected to the private RDS endpoint"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">psql installed on the bastion and connected successfully to the private RDS endpoint</p>
+
+        <div class="code-block">
+          <div class="code-block-header"><span>Connect from the bastion</span></div>
+          <pre>sudo yum install postgresql15 -y
+psql -h &lt;RDS_ENDPOINT&gt; -U dbadmin -d postgres</pre>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>Step 7 — Testing the Database and Backups</h2>
+        <p>I created a small <span class="code-inline">testdb</span> database, added a users table, inserted sample rows,
+          and queried them back. It was deliberately simple, but it verified the full path: workstation to bastion,
+          bastion to private RDS endpoint, and SQL execution inside PostgreSQL.</p>
+        <p>Automated backups were enabled with a seven-day retention period. I also configured CloudWatch alarms for high
+          CPU utilization and low free storage so the database would have a basic operational safety net instead of
+          relying on me to remember to check it manually.</p>
+
+        <img src="../assets/images/blog/project 4/9.jpeg" alt="SQL database and users table tested successfully in psql"
+          class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">End-to-end database test passing: testdb, the users table, and sample records returned from PostgreSQL</p>
+
+        <hr class="article-divider" />
+
+        <h2>What Needed the Most Attention</h2>
+        <p>The most important decisions were not inside the SQL commands. They were made before the first connection:
+          keeping RDS private, placing it in subnets across two Availability Zones, and allowing port 5432 only from
+          the bastion security group. Those choices determine the database's exposure long before an application sends
+          its first query.</p>
+        <p>The bastion also made the connection flow easier to understand. At first I tried typing the database hostname
+          directly into the shell, which of course treated it like a command. Once I used it as the host argument to
+          <span class="code-inline">psql</span>, the connection worked. A small mistake, but a good reminder that
+          infrastructure work is often about using the right value in the right context.</p>
+
+        <hr class="article-divider" />
+
+        <h2>What This Project Taught Me</h2>
+
+        <div class="skills-gained-grid">
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-database"></i> Managed Databases</h4>
+            <ul>
+              <li>RDS instance provisioning</li>
+              <li>PostgreSQL configuration</li>
+              <li>Automated backup retention</li>
+              <li>Multi-AZ availability</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-network-wired"></i> Networking</h4>
+            <ul>
+              <li>Private database subnets</li>
+              <li>Public and private routing</li>
+              <li>DB subnet groups</li>
+              <li>Internet gateway boundaries</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-shield-halved"></i> Access Control</h4>
+            <ul>
+              <li>Security group references</li>
+              <li>Restricted SSH access</li>
+              <li>Private RDS endpoints</li>
+              <li>Encrypted database storage</li>
+            </ul>
+          </div>
+          <div class="skills-gained-card">
+            <h4><i class="fas fa-chart-line"></i> Operations</h4>
+            <ul>
+              <li>CloudWatch RDS alarms</li>
+              <li>PostgreSQL client testing</li>
+              <li>Backup verification</li>
+              <li>Failover awareness</li>
+            </ul>
+          </div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>The Bigger Picture</h2>
+        <p>This project changed how I think about a database in the cloud. It is not just a PostgreSQL endpoint. It is a
+          combination of placement, access rules, resilience, recovery, and monitoring. RDS removes a lot of repetitive
+          server maintenance, but it does not remove the need to design carefully.</p>
+        <p>The best part was being able to test real SQL against a database that was never exposed publicly. That made
+          the security model practical instead of theoretical: private networking did not stop me from working, it just
+          made the route to the database intentional.</p>
+
+        <div class="article-callout success">
+          <i class="fas fa-circle-check"></i>
+          <div><strong>Real takeaway:</strong> High availability is not one checkbox. It is the result of several
+            decisions working together: multiple Availability Zones, private subnets, controlled access, backups, and
+            monitoring that tells you when the system needs attention.</div>
+        </div>
+
+        <hr class="article-divider" />
+
+        <h2>What's Next</h2>
+        <p>The next useful step would be connecting an application to this database without putting credentials in code,
+          then exploring IAM authentication, Secrets Manager, and a private application tier. For now, the core result
+          is solid: a private PostgreSQL database, a controlled administrative path, and a recovery plan running in the
+          background.</p>
+
+        <!-- Tech Stack Summary -->
+        <div class="article-tech-stack">
+          <h4>Tech Stack</h4>
+          <div class="card-tech">
+            <span>Amazon RDS</span><span>PostgreSQL 15</span><span>VPC</span><span>EC2</span>
+            <span>Security Groups</span><span>CloudWatch</span><span>Multi-AZ</span>
+          </div>
+        </div>
+
+        <!-- Article Footer Actions -->
+        <div class="article-footer-actions">
+          <a href="index.html" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to Blog</a>
+          <a href="blog-post-3.html" class="btn btn-outline"><i class="fas fa-book-open"></i> Read Project 03</a>
+          <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20read%20your%20RDS%20article%20and%20would%20like%20to%20connect."
+            target="_blank" rel="noopener" class="btn btn-primary">
+            <i class="fab fa-whatsapp"></i> Discuss on WhatsApp
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Sidebar TOC -->
+      <aside class="article-sidebar">
+        <div class="toc-card">
+          <h4><i class="fas fa-list"></i> Table of Contents</h4>
+          <ol class="toc-list">
+            <li><a href="#" onclick="return false;">Project Overview</a></li>
+            <li><a href="#" onclick="return false;">Services Used</a></li>
+            <li><a href="#" onclick="return false;">Architecture</a></li>
+            <li><a href="#" onclick="return false;">Step 1 — VPC and Subnets</a></li>
+            <li><a href="#" onclick="return false;">Step 2 — Internet Gateway</a></li>
+            <li><a href="#" onclick="return false;">Step 3 — Security Groups</a></li>
+            <li><a href="#" onclick="return false;">Step 4 — DB Subnet Group</a></li>
+            <li><a href="#" onclick="return false;">Step 5 — RDS PostgreSQL</a></li>
+            <li><a href="#" onclick="return false;">Step 6 — Bastion Connection</a></li>
+            <li><a href="#" onclick="return false;">Step 7 — Testing</a></li>
+            <li><a href="#" onclick="return false;">What I Learned</a></li>
+            <li><a href="#" onclick="return false;">What's Next</a></li>
+          </ol>
+        </div>
+
+        <div class="author-card">
+          <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-card-avatar" />
+          <h4>Daniel Ayodele</h4>
+          <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast documenting my cloud journey one project at a time.</p>
+          <div class="author-socials">
+            <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"><i
+                class="fab fa-linkedin-in"></i></a>
+            <a href="https://github.com/temi-Dee" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
+            <a href="mailto:ayodeledaniel0240@gmail.com"><i class="fas fa-envelope"></i></a>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </article>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="../index.html" class="nav-logo">
+          <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+        </a>
+        <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast building secure, scalable cloud solutions.</p>
+      </div>
+      <div class="footer-nav">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="../index.html#projects">Projects</a></li>
+          <li><a href="index.html">Blog</a></li>
+          <li><a href="../contact.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-connect">
+        <h4>Connect</h4>
+        <div class="footer-socials">
+          <a href="https://github.com/temi-Dee" target="_blank" rel="noopener" aria-label="GitHub"><i
+              class="fab fa-github"></i></a>
+          <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"
+            aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+          <a href="mailto:ayodeledaniel0240@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom container">
+      <p>&copy; 2026 Daniel Ayodele | AWS Cloud Engineer &amp; Cybersecurity Enthusiast</p>
+      <div class="footer-links">
+        <a href="https://github.com/temi-Dee" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener">LinkedIn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WhatsApp Float -->
+  <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect."
+    class="wa-float" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+    <span class="wa-tooltip">Chat on WhatsApp</span>
+  </a>
+
+  <script src="../js/script.js"></script>
+  <script src="../js/blog.js"></script>
+</body>
+
+</html>
