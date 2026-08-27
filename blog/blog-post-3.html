@@ -127,8 +127,23 @@ CloudWatch Logs — full execution log</pre>
         <p>Before Lambda can send any email, SES needs to know that you actually own the address you're sending from. In sandbox mode — which is where every new account starts — both the sender and the recipient address have to be verified. You add an email identity, AWS sends a verification link to that inbox, and once you click it, SES trusts the address.</p>
         <p>It's a small step but an easy one to trip over if you forget. I tried testing the function before clicking the verification link on my first attempt, got an error, then realised what I'd missed.</p>
 
-        <img src="../assets/images/blog/project 3/image 1.jpeg" alt="SES email identity verification" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Amazon SES — verified email identity confirmed and ready to send</p>
+        <img src="../assets/images/blog/project 3/image 1.jpeg" alt="Amazon SES email identity awaiting verification" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">Amazon SES identity — verification is pending and the confirmation email must be opened before sending</p>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="../assets/images/blog/project 3/image 2.jpeg" alt="Amazon SES email verification message in Gmail" loading="lazy" />
+            <figcaption>Amazon SES verification email received in Gmail with the link used to confirm the sending identity</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 3/image 3.jpeg" alt="Amazon SES email identity verification success page" loading="lazy" />
+            <figcaption>Amazon SES verification complete — the email identity is now authorized to send</figcaption>
+          </figure>
+          <figure>
+            <img src="../assets/images/blog/project 3/image 4.jpeg" alt="Verified Amazon SES email identity in the AWS Console" loading="lazy" />
+            <figcaption>Amazon SES identity confirmed — the Send test email action is now available</figcaption>
+          </figure>
+        </div>
 
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
@@ -140,9 +155,6 @@ CloudWatch Logs — full execution log</pre>
         <h2>Step 2 — The IAM Role for Lambda</h2>
         <p>Lambda functions don't have permissions by default. You have to explicitly tell AWS what the function is allowed to do, and you do that through an IAM role. The role <span class="code-inline">ContactFormLambdaRole</span> needed two things: the basic Lambda execution policy so it could write logs to CloudWatch, and an inline policy granting it permission to call <span class="code-inline">ses:SendEmail</span> and <span class="code-inline">ses:SendRawEmail</span>.</p>
         <p>Getting this right before creating the function saves a lot of back-and-forth. If the role is missing permissions, Lambda will execute but SES will reject the call and you'll get a permissions error buried in the CloudWatch logs.</p>
-
-        <img src="../assets/images/blog/project 3/image 2.jpeg" alt="IAM role ContactFormLambdaRole created" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">IAM role ContactFormLambdaRole created with Lambda as trusted entity and SES send permissions attached</p>
 
         <div class="article-callout warning">
           <i class="fas fa-triangle-exclamation"></i>
@@ -180,25 +192,14 @@ exports.handler = async (event) => {
 };</pre>
         </div>
 
-        <div class="screenshot-grid">
-          <figure>
-            <img src="../assets/images/blog/project 3/image 3.jpeg" alt="Lambda function created in AWS Console" loading="lazy" />
-            <figcaption>Lambda function ContactFormHandler created, Node.js 18.x runtime, IAM role attached</figcaption>
-          </figure>
-          <figure>
-            <img src="../assets/images/blog/project 3/image 4.jpeg" alt="Lambda environment variables configured" loading="lazy" />
-            <figcaption>Environment variables set — SENDER_EMAIL and RECIPIENT_EMAIL configured without touching the code</figcaption>
-          </figure>
-        </div>
-
         <hr class="article-divider" />
 
         <h2>Step 4 — Setting Up API Gateway</h2>
         <p>Lambda on its own has no public URL. API Gateway is what gives it one. I created a REST API named <span class="code-inline">ContactFormAPI</span>, added a <span class="code-inline">/contact</span> resource, and created a POST method with Lambda proxy integration enabled. That proxy setting is important — it passes the full HTTP request object to Lambda as-is, which is what lets the function read the form data from <span class="code-inline">event.body</span>.</p>
         <p>The other thing that needed setting up was CORS. Because the form is on a static HTML page hosted somewhere else (a different origin), the browser will block the request unless the API returns the right headers. I added an OPTIONS method with the correct <span class="code-inline">Access-Control-Allow-Origin</span> headers, deployed to a <span class="code-inline">prod</span> stage, and the endpoint was live.</p>
 
-        <img src="../assets/images/blog/project 3/image 5.jpeg" alt="API Gateway REST API configured" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">API Gateway — ContactFormAPI with /contact resource, POST method, Lambda proxy integration, and CORS configured</p>
+        <img src="../assets/images/blog/project 3/image 5.jpeg" alt="ContactForm REST API listed in the API Gateway console" class="project-screenshot" loading="lazy" />
+        <p class="screenshot-caption">API Gateway — ContactForm REST API created and listed in the AWS console, ready for its resources and methods</p>
 
         <div class="article-callout info">
           <i class="fas fa-lightbulb"></i>
@@ -221,12 +222,12 @@ exports.handler = async (event) => {
 
         <div class="screenshot-grid">
           <figure>
-            <img src="../assets/images/blog/project 3/image 6.jpeg" alt="Lambda test execution successful" loading="lazy" />
-            <figcaption>Lambda test execution returning success response — function ran and SES call completed</figcaption>
+            <img src="../assets/images/blog/project 3/image 6.jpeg" alt="Contact form test showing a CORS error in the browser console" loading="lazy" />
+            <figcaption>First browser test — the form request is blocked by a missing CORS response header</figcaption>
           </figure>
           <figure>
-            <img src="../assets/images/blog/project 3/image 7.jpeg" alt="CloudWatch logs showing Lambda execution" loading="lazy" />
-            <figcaption>CloudWatch Logs — full execution trace for the ContactFormHandler invocation</figcaption>
+            <img src="../assets/images/blog/project 3/image 7.jpeg" alt="Contact form sending successfully through API Gateway" loading="lazy" />
+            <figcaption>End-to-end test passing — the API Gateway setup and contact form both show a successful submission</figcaption>
           </figure>
         </div>
 
