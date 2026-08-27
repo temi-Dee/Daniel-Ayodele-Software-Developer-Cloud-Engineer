@@ -2,134 +2,145 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Infrastructure as Code with Terraform | Daniel Ayodele</title>
-  <meta name="description"
-    content="How I used Terraform modules and remote state to provision an AWS VPC, EC2 instance, and RDS PostgreSQL database as reusable infrastructure as code." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
-    rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="icon" type="image/png" href="../assets/logo.png" />
-  <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="../css/blog.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Infrastructure as Code with Terraform | Daniel Ayodele</title>
+    <meta name="description"
+        content="How I used Terraform modules and remote state to provision an AWS VPC, EC2 instance, and RDS PostgreSQL database as reusable infrastructure as code." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="icon" type="image/png" href="../assets/logo.png" />
+    <link rel="stylesheet" href="../css/style.css" />
+    <link rel="stylesheet" href="../css/blog.css" />
 </head>
 
 <body>
 
-  <!-- ===== NAVBAR ===== -->
-  <nav class="navbar" id="navbar">
-    <div class="nav-container container">
-      <a href="../index.html" class="nav-logo">
-        <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
-        <span class="nav-tagline">AWS Cloud Engineer<span class="nav-tagline-sep">|</span>Cybersecurity</span>
-      </a>
-      <ul class="nav-links" id="navLinks">
-        <li><a href="../index.html">Home</a></li>
-        <li><a href="../index.html#projects">Projects</a></li>
-        <li><a href="index.html" class="nav-active">Blog</a></li>
-        <li><a href="../index.html#about">About</a></li>
-        <li><a href="../contact.html">Contact</a></li>
-      </ul>
-      <div class="nav-actions">
-        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light mode">
-          <i class="fas fa-sun" id="themeIcon"></i>
-        </button>
-        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- ===== ARTICLE HERO ===== -->
-  <section class="article-hero">
-    <div class="container article-hero-inner">
-      <div class="article-meta-top">
-        <span class="blog-cat-pill"><i class="fas fa-flask"></i> AWS LABS</span>
-        <span class="article-read-time"><i class="fas fa-clock"></i> 14 min read</span>
-      </div>
-      <h1>Project 06 — Infrastructure as Code with Terraform</h1>
-      <p class="article-subtitle">How I turned an AWS VPC, EC2, and RDS stack into reusable Terraform modules with remote state and repeatable deployments.</p>
-      <div class="article-author">
-        <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-avatar" />
-        <div>
-          <strong>Daniel Ayodele</strong>
-          <span>AWS Cloud Engineer &amp; Cybersecurity Enthusiast</span>
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container container">
+            <a href="../index.html" class="nav-logo">
+                <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+                <span class="nav-tagline">AWS Cloud Engineer<span class="nav-tagline-sep">|</span>Cybersecurity</span>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../index.html#projects">Projects</a></li>
+                <li><a href="index.html" class="nav-active">Blog</a></li>
+                <li><a href="../index.html#about">About</a></li>
+                <li><a href="../contact.html">Contact</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle light mode">
+                    <i class="fas fa-sun" id="themeIcon"></i>
+                </button>
+                <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
         </div>
-      </div>
-      <div class="article-tags">
-        <span>Terraform</span><span>Infrastructure as Code</span><span>AWS VPC</span><span>EC2</span><span>RDS</span><span>Remote State</span>
-      </div>
-    </div>
-  </section>
+    </nav>
 
-  <!-- ===== ARTICLE BODY ===== -->
-  <article class="article-body">
-    <div class="container article-layout">
-
-      <!-- Main Content -->
-      <div class="article-content">
-
-        <p class="article-lead">Projects 01 through 05 taught me how to build AWS resources and automate application delivery. Project 06 changed the question from “Can I create this?” to “Can I recreate this reliably?” I used Terraform to describe a complete AWS stack in code: a VPC, public and private subnets, an EC2 instance, and an RDS PostgreSQL database. The result was infrastructure I could review, apply, change, and destroy without rebuilding it by hand in the console.</p>
-
-        <hr class="article-divider" />
-
-        <h2>The Problem I Wanted to Solve</h2>
-        <p>Creating resources manually works for learning, but it becomes difficult to trust once there are many settings to remember. A missed route, an incorrect subnet, or a security group rule can leave two environments subtly different. Terraform gives those decisions a home in version-controlled configuration.</p>
-        <p>I also wanted the state file to live remotely. Terraform needs state to understand what it manages, so storing that state in an encrypted, versioned S3 bucket with DynamoDB locking makes collaboration and recovery much safer than keeping one local file on my laptop.</p>
-
-        <hr class="article-divider" />
-
-        <h2>Services and Technologies Used</h2>
-
-        <div class="article-table-wrap">
-          <table class="article-table">
-            <thead>
-              <tr>
-                <th>Tool or Service</th>
-                <th>Purpose</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="code-inline">Terraform</span></td>
-                <td>Defines, plans, applies, and tracks the AWS infrastructure</td>
-              </tr>
-              <tr>
-                <td><span class="code-inline">Terraform Modules</span></td>
-                <td>Separates VPC, EC2, and RDS resources into reusable components</td>
-              </tr>
-              <tr>
-                <td><span class="code-inline">Amazon VPC</span></td>
-                <td>Provides the network, subnets, routes, gateway, and security groups</td>
-              </tr>
-              <tr>
-                <td><span class="code-inline">Amazon EC2</span></td>
-                <td>Runs the web instance created by the EC2 module</td>
-              </tr>
-              <tr>
-                <td><span class="code-inline">Amazon RDS</span></td>
-                <td>Runs the PostgreSQL database inside private subnets</td>
-              </tr>
-              <tr>
-                <td><span class="code-inline">S3 and DynamoDB</span></td>
-                <td>Store and lock Terraform's remote state</td>
-              </tr>
-            </tbody>
-          </table>
+    <!-- ===== ARTICLE HERO ===== -->
+    <section class="article-hero">
+        <div class="container article-hero-inner">
+            <div class="article-meta-top">
+                <span class="blog-cat-pill"><i class="fas fa-flask"></i> AWS LABS</span>
+                <span class="article-read-time"><i class="fas fa-clock"></i> 14 min read</span>
+            </div>
+            <h1>Project 06 — Infrastructure as Code with Terraform</h1>
+            <p class="article-subtitle">How I turned an AWS VPC, EC2, and RDS stack into reusable Terraform modules with
+                remote state and repeatable deployments.</p>
+            <div class="article-author">
+                <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-avatar" />
+                <div>
+                    <strong>Daniel Ayodele</strong>
+                    <span>AWS Cloud Engineer &amp; Cybersecurity Enthusiast</span>
+                </div>
+            </div>
+            <div class="article-tags">
+                <span>Terraform</span><span>Infrastructure as Code</span><span>AWS
+                    VPC</span><span>EC2</span><span>RDS</span><span>Remote State</span>
+            </div>
         </div>
+    </section>
 
-        <hr class="article-divider" />
+    <!-- ===== ARTICLE BODY ===== -->
+    <article class="article-body">
+        <div class="container article-layout">
 
-        <h2>How the Terraform Project Fits Together</h2>
+            <!-- Main Content -->
+            <div class="article-content">
 
-        <div class="code-block">
-          <div class="code-block-header"><span>Module Structure</span></div>
-          <pre>terraform-project/
+                <p class="article-lead">Projects 01 through 05 taught me how to build AWS resources and automate
+                    application delivery. Project 06 changed the question from “Can I create this?” to “Can I recreate
+                    this reliably?” I used Terraform to describe a complete AWS stack in code: a VPC, public and private
+                    subnets, an EC2 instance, and an RDS PostgreSQL database. The result was infrastructure I could
+                    review, apply, change, and destroy without rebuilding it by hand in the console.</p>
+
+                <hr class="article-divider" />
+
+                <h2>The Problem I Wanted to Solve</h2>
+                <p>Creating resources manually works for learning, but it becomes difficult to trust once there are many
+                    settings to remember. A missed route, an incorrect subnet, or a security group rule can leave two
+                    environments subtly different. Terraform gives those decisions a home in version-controlled
+                    configuration.</p>
+                <p>I also wanted the state file to live remotely. Terraform needs state to understand what it manages,
+                    so storing that state in an encrypted, versioned S3 bucket with DynamoDB locking makes collaboration
+                    and recovery much safer than keeping one local file on my laptop.</p>
+
+                <hr class="article-divider" />
+
+                <h2>Services and Technologies Used</h2>
+
+                <div class="article-table-wrap">
+                    <table class="article-table">
+                        <thead>
+                            <tr>
+                                <th>Tool or Service</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="code-inline">Terraform</span></td>
+                                <td>Defines, plans, applies, and tracks the AWS infrastructure</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-inline">Terraform Modules</span></td>
+                                <td>Separates VPC, EC2, and RDS resources into reusable components</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-inline">Amazon VPC</span></td>
+                                <td>Provides the network, subnets, routes, gateway, and security groups</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-inline">Amazon EC2</span></td>
+                                <td>Runs the web instance created by the EC2 module</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-inline">Amazon RDS</span></td>
+                                <td>Runs the PostgreSQL database inside private subnets</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-inline">S3 and DynamoDB</span></td>
+                                <td>Store and lock Terraform's remote state</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr class="article-divider" />
+
+                <h2>How the Terraform Project Fits Together</h2>
+
+                <div class="code-block">
+                    <div class="code-block-header"><span>Module Structure</span></div>
+                    <pre>terraform-project/
   ├── backend.tf       # Remote S3 state and locking
   ├── main.tf          # Provider and module calls
   ├── variables.tf     # Shared inputs
@@ -138,250 +149,311 @@
       ├── vpc/          # Network and security groups
       ├── ec2/          # Web instance and IAM profile
       └── rds/          # PostgreSQL and DB subnet group</pre>
-        </div>
+                </div>
 
-        <hr class="article-divider" />
+                <hr class="article-divider" />
 
-        <h2>Step 1 — Writing the Configuration</h2>
-        <p>I began with the root module files and a <span class="code-inline">terraform.tfvars</span> file for environment values. The configuration included the AWS region, CIDR ranges, Availability Zones, instance types, and database settings. The resource definitions stayed in modules so the root module could focus on wiring the system together.</p>
-        <p>Seeing the variables and modules together made the design easier to reason about. Instead of one long file that mixed every resource, each module had a clear boundary and a small set of inputs and outputs.</p>
+                <h2>Step 1 — Writing the Configuration</h2>
+                <p>I began with the root module files and a <span class="code-inline">terraform.tfvars</span> file for
+                    environment values. The configuration included the AWS region, CIDR ranges, Availability Zones,
+                    instance types, and database settings. The resource definitions stayed in modules so the root module
+                    could focus on wiring the system together.</p>
+                <p>Seeing the variables and modules together made the design easier to reason about. Instead of one long
+                    file that mixed every resource, each module had a clear boundary and a small set of inputs and
+                    outputs.</p>
 
-        <img src="../assets/images/blog/project 6/1.jpeg" alt="Terraform project files and terminal showing infrastructure apply in progress" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Terraform project open in VS Code while the modular infrastructure configuration is being applied</p>
+                <img src="../assets/images/blog/project 6/1.jpeg"
+                    alt="Terraform project files and terminal showing infrastructure apply in progress"
+                    class="project-screenshot" loading="lazy" />
+                <p class="screenshot-caption">Terraform project open in VS Code while the modular infrastructure
+                    configuration is being applied</p>
 
-        <hr class="article-divider" />
+                <hr class="article-divider" />
 
-        <h2>Step 2 — Building the VPC Module</h2>
-        <p>The VPC module created the network foundation: the VPC itself, public and private subnets across two Availability Zones, an internet gateway, a public route table, and security groups. The public subnets were intended for the web instance, while the private subnets gave RDS a controlled network location.</p>
-        <p>This was the first place where Terraform’s declarative model became useful. I described the desired relationships, and Terraform worked out the order needed to create them.</p>
+                <h2>Step 2 — Building the VPC Module</h2>
+                <p>The VPC module created the network foundation: the VPC itself, public and private subnets across two
+                    Availability Zones, an internet gateway, a public route table, and security groups. The public
+                    subnets were intended for the web instance, while the private subnets gave RDS a controlled network
+                    location.</p>
+                <p>This was the first place where Terraform’s declarative model became useful. I described the desired
+                    relationships, and Terraform worked out the order needed to create them.</p>
 
-        <img src="../assets/images/blog/project 6/2.jpeg" alt="Terraform-created VPC visible in the AWS VPC console" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">The Terraform-created VPC visible in the AWS console with its generated VPC ID and available state</p>
+                <img src="../assets/images/blog/project 6/2.jpeg"
+                    alt="Terraform-created VPC visible in the AWS VPC console" class="project-screenshot"
+                    loading="lazy" />
+                <p class="screenshot-caption">The Terraform-created VPC visible in the AWS console with its generated
+                    VPC ID and available state</p>
 
-        <img src="../assets/images/blog/project 6/3.jpeg" alt="Terraform-created public and private subnets in AWS" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Public and private subnets created across the configured Availability Zones</p>
+                <img src="../assets/images/blog/project 6/3.jpeg"
+                    alt="Terraform-created public and private subnets in AWS" class="project-screenshot"
+                    loading="lazy" />
+                <p class="screenshot-caption">Public and private subnets created across the configured Availability
+                    Zones</p>
 
-        <div class="screenshot-grid">
-          <figure>
-            <img src="../assets/images/blog/project 6/4.jpeg" alt="Terraform-created internet gateways in the AWS console" loading="lazy" />
-            <figcaption>Internet gateway resources showing the Terraform-created gateway attached to the project VPC</figcaption>
-          </figure>
-          <figure>
-            <img src="../assets/images/blog/project 6/5.jpeg" alt="Terraform-created public route table in the AWS console" loading="lazy" />
-            <figcaption>Public route table created by Terraform with its subnet associations visible</figcaption>
-          </figure>
-        </div>
+                <div class="screenshot-grid">
+                    <figure>
+                        <img src="../assets/images/blog/project 6/4.jpeg"
+                            alt="Terraform-created internet gateways in the AWS console" loading="lazy" />
+                        <figcaption>Internet gateway resources showing the Terraform-created gateway attached to the
+                            project VPC</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="../assets/images/blog/project 6/5.jpeg"
+                            alt="Terraform-created public route table in the AWS console" loading="lazy" />
+                        <figcaption>Public route table created by Terraform with its subnet associations visible
+                        </figcaption>
+                    </figure>
+                </div>
 
-        <hr class="article-divider" />
+                <hr class="article-divider" />
 
-        <h2>Step 3 — Applying the Full Stack</h2>
-        <p>Once the modules were connected, I ran <span class="code-inline">terraform apply</span>. Terraform acquired the remote state lock and began creating the resources in dependency order. The terminal output made the process easy to follow: IAM resources completed first, the VPC and subnets followed, then the database and compute resources continued provisioning.</p>
-        <p>There is something satisfying about watching a complete environment appear from a plan. The output also made the wait times honest. RDS took longer than the network resources, and Terraform kept the state of the operation visible while it worked.</p>
+                <h2>Step 3 — Applying the Full Stack</h2>
+                <p>Once the modules were connected, I ran <span class="code-inline">terraform apply</span>. Terraform
+                    acquired the remote state lock and began creating the resources in dependency order. The terminal
+                    output made the process easy to follow: IAM resources completed first, the VPC and subnets followed,
+                    then the database and compute resources continued provisioning.</p>
+                <p>There is something satisfying about watching a complete environment appear from a plan. The output
+                    also made the wait times honest. RDS took longer than the network resources, and Terraform kept the
+                    state of the operation visible while it worked.</p>
 
-        <img src="../assets/images/blog/project 6/6.jpeg" alt="Terraform apply showing resources being created across VPC EC2 and RDS modules" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Terraform apply in progress as the VPC, IAM, EC2, and RDS modules create their resources</p>
+                <img src="../assets/images/blog/project 6/6.jpeg"
+                    alt="Terraform apply showing resources being created across VPC EC2 and RDS modules"
+                    class="project-screenshot" loading="lazy" />
+                <p class="screenshot-caption">Terraform apply in progress as the VPC, IAM, EC2, and RDS modules create
+                    their resources</p>
 
-        <img src="../assets/images/blog/project 6/7.jpeg" alt="Successful Terraform apply showing 18 resources added and outputs" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Successful apply completed with 18 resources added and the key infrastructure outputs returned</p>
+                <img src="../assets/images/blog/project 6/7.jpeg"
+                    alt="Successful Terraform apply showing 18 resources added and outputs" class="project-screenshot"
+                    loading="lazy" />
+                <p class="screenshot-caption">Successful apply completed with 18 resources added and the key
+                    infrastructure outputs returned</p>
 
-        <div class="article-callout success">
-          <i class="fas fa-circle-check"></i>
-          <div><strong>The important moment:</strong> The environment was no longer a collection of console clicks. It was represented by code that could be reviewed and applied again, with Terraform explaining exactly what changed.</div>
-        </div>
+                <div class="article-callout success">
+                    <i class="fas fa-circle-check"></i>
+                    <div><strong>The important moment:</strong> The environment was no longer a collection of console
+                        clicks. It was represented by code that could be reviewed and applied again, with Terraform
+                        explaining exactly what changed.</div>
+                </div>
 
-        <hr class="article-divider" />
+                <hr class="article-divider" />
 
-        <h2>Step 4 — Inspecting State and Verifying AWS</h2>
-        <p>After the apply completed, I used Terraform outputs and state commands to inspect what had been created. I also checked AWS directly: the EC2 instance was running, and the RDS database had reached the available state with a private endpoint.</p>
-        <p>This two-sided verification matters. Terraform confirms what it believes it manages, while the AWS console and CLI confirm the resources are healthy in the provider itself.</p>
+                <h2>Step 4 — Inspecting State and Verifying AWS</h2>
+                <p>After the apply completed, I used Terraform outputs and state commands to inspect what had been
+                    created. I also checked AWS directly: the EC2 instance was running, and the RDS database had reached
+                    the available state with a private endpoint.</p>
+                <p>This two-sided verification matters. Terraform confirms what it believes it manages, while the AWS
+                    console and CLI confirm the resources are healthy in the provider itself.</p>
 
-        <img src="../assets/images/blog/project 6/8.jpeg" alt="Terraform state and AWS CLI verification showing running EC2 and available RDS" class="project-screenshot" loading="lazy" />
-        <p class="screenshot-caption">Post-apply verification showing the running EC2 instance and available RDS database returned by AWS CLI queries</p>
+                <img src="../assets/images/blog/project 6/8.jpeg"
+                    alt="Terraform state and AWS CLI verification showing running EC2 and available RDS"
+                    class="project-screenshot" loading="lazy" />
+                <p class="screenshot-caption">Post-apply verification showing the running EC2 instance and available RDS
+                    database returned by AWS CLI queries</p>
 
-        <div class="code-block">
-          <div class="code-block-header"><span>Useful state commands</span></div>
-          <pre>terraform state list
+                <div class="code-block">
+                    <div class="code-block-header"><span>Useful state commands</span></div>
+                    <pre>terraform state list
 terraform output
 terraform state pull &gt; terraform.tfstate.backup</pre>
+                </div>
+
+                <hr class="article-divider" />
+
+                <h2>Step 5 — Making a Change Safely</h2>
+                <p>Infrastructure as code becomes most useful after the first deployment. I changed an input value and
+                    ran <span class="code-inline">terraform plan</span> again. Terraform showed the intended update, the
+                    unchanged attributes, and the values that would be known only after apply.</p>
+                <p>That preview creates a useful pause before a change reaches AWS. Instead of guessing which resources
+                    a manual edit might affect, I could review the proposed action first and apply the exact plan only
+                    when it made sense.</p>
+
+                <div class="article-callout warning">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <div><strong>Review before apply:</strong> Terraform is powerful because it can change real
+                        infrastructure. Always inspect the plan, protect remote state, and keep database credentials out
+                        of committed variable files.</div>
+                </div>
+
+                <hr class="article-divider" />
+
+                <h2>What Needed the Most Attention</h2>
+                <p>The most important design decision was separating reusable modules from environment-specific values.
+                    That kept the configuration understandable and made it possible to change an instance type or CIDR
+                    range without hunting through unrelated resources.</p>
+                <p>Remote state was another lesson. State is not just a cache; it is Terraform’s record of ownership and
+                    relationships. Versioning the S3 bucket and locking updates with DynamoDB gives that record a
+                    recovery path and helps prevent two changes from colliding.</p>
+
+                <hr class="article-divider" />
+
+                <h2>What This Project Taught Me</h2>
+
+                <div class="skills-gained-grid">
+                    <div class="skills-gained-card">
+                        <h4><i class="fas fa-code"></i> Terraform</h4>
+                        <ul>
+                            <li>HCL configuration</li>
+                            <li>Providers and resources</li>
+                            <li>Plan and apply workflow</li>
+                            <li>State inspection</li>
+                        </ul>
+                    </div>
+                    <div class="skills-gained-card">
+                        <h4><i class="fas fa-cubes"></i> Modules</h4>
+                        <ul>
+                            <li>Reusable VPC module</li>
+                            <li>EC2 module inputs</li>
+                            <li>RDS module boundaries</li>
+                            <li>Outputs between modules</li>
+                        </ul>
+                    </div>
+                    <div class="skills-gained-card">
+                        <h4><i class="fas fa-database"></i> Remote State</h4>
+                        <ul>
+                            <li>S3 state storage</li>
+                            <li>Bucket versioning</li>
+                            <li>DynamoDB locking</li>
+                            <li>State backups</li>
+                        </ul>
+                    </div>
+                    <div class="skills-gained-card">
+                        <h4><i class="fas fa-network-wired"></i> AWS Architecture</h4>
+                        <ul>
+                            <li>VPC subnet design</li>
+                            <li>EC2 and RDS placement</li>
+                            <li>Security group rules</li>
+                            <li>CLI verification</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <hr class="article-divider" />
+
+                <h2>The Bigger Picture</h2>
+                <p>Terraform did not remove the need to understand AWS. It made my AWS decisions more visible. I still
+                    had to choose the network layout, security boundaries, instance settings, and database placement,
+                    but those decisions were now written down and repeatable.</p>
+                <p>That is the real value of infrastructure as code for me: not simply faster provisioning, but a
+                    clearer relationship between an architectural decision and the resources that implement it.</p>
+
+                <div class="article-callout success">
+                    <i class="fas fa-circle-check"></i>
+                    <div><strong>Real takeaway:</strong> The best Terraform workflow is deliberately boring: write the
+                        configuration, validate it, review the plan, apply it, verify the result, and destroy what you
+                        no longer need.</div>
+                </div>
+
+                <hr class="article-divider" />
+
+                <h2>What's Next</h2>
+                <p>The next step is to add environment separation, stronger secret handling, and CI checks for Terraform
+                    formatting and validation. The foundation is ready: the AWS stack can be reviewed, recreated,
+                    changed safely, and managed from code.</p>
+
+                <!-- Tech Stack Summary -->
+                <div class="article-tech-stack">
+                    <h4>Tech Stack</h4>
+                    <div class="card-tech">
+                        <span>Terraform</span><span>HCL</span><span>AWS VPC</span><span>EC2</span><span>RDS</span>
+                        <span>S3</span><span>DynamoDB</span><span>PostgreSQL</span>
+                    </div>
+                </div>
+
+                <!-- Article Footer Actions -->
+                <div class="article-footer-actions">
+                    <a href="index.html" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to Blog</a>
+                    <a href="blog-post-5.html" class="btn btn-outline"><i class="fas fa-book-open"></i> Read Project
+                        05</a>
+                    <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20read%20your%20Terraform%20article%20and%20would%20like%20to%20connect."
+                        target="_blank" rel="noopener" class="btn btn-primary">
+                        <i class="fab fa-whatsapp"></i> Discuss on WhatsApp
+                    </a>
+                </div>
+
+            </div>
+
+            <!-- Sidebar TOC -->
+            <aside class="article-sidebar">
+                <div class="toc-card">
+                    <h4><i class="fas fa-list"></i> Table of Contents</h4>
+                    <ol class="toc-list">
+                        <li><a href="#" onclick="return false;">Project Overview</a></li>
+                        <li><a href="#" onclick="return false;">Services Used</a></li>
+                        <li><a href="#" onclick="return false;">Module Structure</a></li>
+                        <li><a href="#" onclick="return false;">Step 1 — Configuration</a></li>
+                        <li><a href="#" onclick="return false;">Step 2 — VPC Module</a></li>
+                        <li><a href="#" onclick="return false;">Step 3 — Full Apply</a></li>
+                        <li><a href="#" onclick="return false;">Step 4 — Verification</a></li>
+                        <li><a href="#" onclick="return false;">Step 5 — Safe Changes</a></li>
+                        <li><a href="#" onclick="return false;">What I Learned</a></li>
+                        <li><a href="#" onclick="return false;">What's Next</a></li>
+                    </ol>
+                </div>
+
+                <div class="author-card">
+                    <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-card-avatar" />
+                    <h4>Daniel Ayodele</h4>
+                    <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast documenting my cloud journey one project at a
+                        time.</p>
+                    <div class="author-socials">
+                        <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"><i
+                                class="fab fa-linkedin-in"></i></a>
+                        <a href="https://github.com/temi-Dee" target="_blank" rel="noopener"><i
+                                class="fab fa-github"></i></a>
+                        <a href="mailto:ayodeledaniel0240@gmail.com"><i class="fas fa-envelope"></i></a>
+                    </div>
+                </div>
+            </aside>
+
         </div>
+    </article>
 
-        <hr class="article-divider" />
-
-        <h2>Step 5 — Making a Change Safely</h2>
-        <p>Infrastructure as code becomes most useful after the first deployment. I changed an input value and ran <span class="code-inline">terraform plan</span> again. Terraform showed the intended update, the unchanged attributes, and the values that would be known only after apply.</p>
-        <p>That preview creates a useful pause before a change reaches AWS. Instead of guessing which resources a manual edit might affect, I could review the proposed action first and apply the exact plan only when it made sense.</p>
-
-        <div class="article-callout warning">
-          <i class="fas fa-triangle-exclamation"></i>
-          <div><strong>Review before apply:</strong> Terraform is powerful because it can change real infrastructure. Always inspect the plan, protect remote state, and keep database credentials out of committed variable files.</div>
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        <div class="container footer-inner">
+            <div class="footer-brand">
+                <a href="../index.html" class="nav-logo">
+                    <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
+                </a>
+                <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast building secure, scalable cloud solutions.</p>
+            </div>
+            <div class="footer-nav">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="../index.html#projects">Projects</a></li>
+                    <li><a href="index.html">Blog</a></li>
+                    <li><a href="../contact.html">Contact</a></li>
+                </ul>
+            </div>
+            <div class="footer-connect">
+                <h4>Connect</h4>
+                <div class="footer-socials">
+                    <a href="https://github.com/temi-Dee" target="_blank" rel="noopener" aria-label="GitHub"><i
+                            class="fab fa-github"></i></a>
+                    <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"
+                        aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="mailto:ayodeledaniel0240@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
+                </div>
+            </div>
         </div>
-
-        <hr class="article-divider" />
-
-        <h2>What Needed the Most Attention</h2>
-        <p>The most important design decision was separating reusable modules from environment-specific values. That kept the configuration understandable and made it possible to change an instance type or CIDR range without hunting through unrelated resources.</p>
-        <p>Remote state was another lesson. State is not just a cache; it is Terraform’s record of ownership and relationships. Versioning the S3 bucket and locking updates with DynamoDB gives that record a recovery path and helps prevent two changes from colliding.</p>
-
-        <hr class="article-divider" />
-
-        <h2>What This Project Taught Me</h2>
-
-        <div class="skills-gained-grid">
-          <div class="skills-gained-card">
-            <h4><i class="fas fa-code"></i> Terraform</h4>
-            <ul>
-              <li>HCL configuration</li>
-              <li>Providers and resources</li>
-              <li>Plan and apply workflow</li>
-              <li>State inspection</li>
-            </ul>
-          </div>
-          <div class="skills-gained-card">
-            <h4><i class="fas fa-cubes"></i> Modules</h4>
-            <ul>
-              <li>Reusable VPC module</li>
-              <li>EC2 module inputs</li>
-              <li>RDS module boundaries</li>
-              <li>Outputs between modules</li>
-            </ul>
-          </div>
-          <div class="skills-gained-card">
-            <h4><i class="fas fa-database"></i> Remote State</h4>
-            <ul>
-              <li>S3 state storage</li>
-              <li>Bucket versioning</li>
-              <li>DynamoDB locking</li>
-              <li>State backups</li>
-            </ul>
-          </div>
-          <div class="skills-gained-card">
-            <h4><i class="fas fa-network-wired"></i> AWS Architecture</h4>
-            <ul>
-              <li>VPC subnet design</li>
-              <li>EC2 and RDS placement</li>
-              <li>Security group rules</li>
-              <li>CLI verification</li>
-            </ul>
-          </div>
+        <div class="footer-bottom container">
+            <p>&copy; 2026 Daniel Ayodele | AWS Cloud Engineer &amp; Cybersecurity Enthusiast</p>
+            <div class="footer-links">
+                <a href="https://github.com/temi-Dee" target="_blank" rel="noopener">GitHub</a>
+                <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener">LinkedIn</a>
+            </div>
         </div>
+    </footer>
 
-        <hr class="article-divider" />
+    <!-- WhatsApp Float -->
+    <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect."
+        class="wa-float" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+        <span class="wa-tooltip">Chat on WhatsApp</span>
+    </a>
 
-        <h2>The Bigger Picture</h2>
-        <p>Terraform did not remove the need to understand AWS. It made my AWS decisions more visible. I still had to choose the network layout, security boundaries, instance settings, and database placement, but those decisions were now written down and repeatable.</p>
-        <p>That is the real value of infrastructure as code for me: not simply faster provisioning, but a clearer relationship between an architectural decision and the resources that implement it.</p>
-
-        <div class="article-callout success">
-          <i class="fas fa-circle-check"></i>
-          <div><strong>Real takeaway:</strong> The best Terraform workflow is deliberately boring: write the configuration, validate it, review the plan, apply it, verify the result, and destroy what you no longer need.</div>
-        </div>
-
-        <hr class="article-divider" />
-
-        <h2>What's Next</h2>
-        <p>The next step is to add environment separation, stronger secret handling, and CI checks for Terraform formatting and validation. The foundation is ready: the AWS stack can be reviewed, recreated, changed safely, and managed from code.</p>
-
-        <!-- Tech Stack Summary -->
-        <div class="article-tech-stack">
-          <h4>Tech Stack</h4>
-          <div class="card-tech">
-            <span>Terraform</span><span>HCL</span><span>AWS VPC</span><span>EC2</span><span>RDS</span>
-            <span>S3</span><span>DynamoDB</span><span>PostgreSQL</span>
-          </div>
-        </div>
-
-        <!-- Article Footer Actions -->
-        <div class="article-footer-actions">
-          <a href="index.html" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to Blog</a>
-          <a href="blog-post-5.html" class="btn btn-outline"><i class="fas fa-book-open"></i> Read Project 05</a>
-          <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20read%20your%20Terraform%20article%20and%20would%20like%20to%20connect."
-            target="_blank" rel="noopener" class="btn btn-primary">
-            <i class="fab fa-whatsapp"></i> Discuss on WhatsApp
-          </a>
-        </div>
-
-      </div>
-
-      <!-- Sidebar TOC -->
-      <aside class="article-sidebar">
-        <div class="toc-card">
-          <h4><i class="fas fa-list"></i> Table of Contents</h4>
-          <ol class="toc-list">
-            <li><a href="#" onclick="return false;">Project Overview</a></li>
-            <li><a href="#" onclick="return false;">Services Used</a></li>
-            <li><a href="#" onclick="return false;">Module Structure</a></li>
-            <li><a href="#" onclick="return false;">Step 1 — Configuration</a></li>
-            <li><a href="#" onclick="return false;">Step 2 — VPC Module</a></li>
-            <li><a href="#" onclick="return false;">Step 3 — Full Apply</a></li>
-            <li><a href="#" onclick="return false;">Step 4 — Verification</a></li>
-            <li><a href="#" onclick="return false;">Step 5 — Safe Changes</a></li>
-            <li><a href="#" onclick="return false;">What I Learned</a></li>
-            <li><a href="#" onclick="return false;">What's Next</a></li>
-          </ol>
-        </div>
-
-        <div class="author-card">
-          <img src="../assets/daniel.png" alt="Daniel Ayodele" class="author-card-avatar" />
-          <h4>Daniel Ayodele</h4>
-          <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast documenting my cloud journey one project at a time.</p>
-          <div class="author-socials">
-            <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"><i
-                class="fab fa-linkedin-in"></i></a>
-            <a href="https://github.com/temi-Dee" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
-            <a href="mailto:ayodeledaniel0240@gmail.com"><i class="fas fa-envelope"></i></a>
-          </div>
-        </div>
-      </aside>
-
-    </div>
-  </article>
-
-  <!-- ===== FOOTER ===== -->
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div class="footer-brand">
-        <a href="../index.html" class="nav-logo">
-          <img src="../assets/logo.png" alt="Daniel Ayodele" class="nav-logo-img" />
-        </a>
-        <p>AWS Cloud Engineer &amp; Cybersecurity Enthusiast building secure, scalable cloud solutions.</p>
-      </div>
-      <div class="footer-nav">
-        <h4>Quick Links</h4>
-        <ul>
-          <li><a href="../index.html#projects">Projects</a></li>
-          <li><a href="index.html">Blog</a></li>
-          <li><a href="../contact.html">Contact</a></li>
-        </ul>
-      </div>
-      <div class="footer-connect">
-        <h4>Connect</h4>
-        <div class="footer-socials">
-          <a href="https://github.com/temi-Dee" target="_blank" rel="noopener" aria-label="GitHub"><i
-              class="fab fa-github"></i></a>
-          <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener"
-            aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
-          <a href="mailto:ayodeledaniel0240@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
-        </div>
-      </div>
-    </div>
-    <div class="footer-bottom container">
-      <p>&copy; 2026 Daniel Ayodele | AWS Cloud Engineer &amp; Cybersecurity Enthusiast</p>
-      <div class="footer-links">
-        <a href="https://github.com/temi-Dee" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://www.linkedin.com/in/danielayodele0420/" target="_blank" rel="noopener">LinkedIn</a>
-      </div>
-    </div>
-  </footer>
-
-  <!-- WhatsApp Float -->
-  <a href="https://wa.me/2349039062561?text=Hi%20Daniel!%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect."
-    class="wa-float" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
-    <i class="fab fa-whatsapp"></i>
-    <span class="wa-tooltip">Chat on WhatsApp</span>
-  </a>
-
-  <script src="../js/script.js"></script>
-  <script src="../js/blog.js"></script>
+    <script src="../js/script.js"></script>
+    <script src="../js/blog.js"></script>
 </body>
 
 </html>
